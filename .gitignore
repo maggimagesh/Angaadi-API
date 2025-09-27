@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Builds / Outputs
+dist/
+build/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.eslintcache
+.node_repl_history
+.tmp/
+.temp/
+
+# Environment files
+.env
+.env.*
+.envrc
+
+# Editor / IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma (local SQLite databases)
+prisma/*.db
+prisma/*.db-journal
+
+# Archives
+*.tgz
+
+.env.local
