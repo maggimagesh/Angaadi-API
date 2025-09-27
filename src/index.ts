@@ -2,9 +2,6 @@ import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './nest/app.module'
 import cors from 'cors'
-import dotenv from 'dotenv'
-
-dotenv.config({ path: '.env.local' })
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false })

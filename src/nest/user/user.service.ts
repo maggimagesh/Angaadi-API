@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { AuthService } from '../auth/auth.service'
 import { PrismaService } from '../prisma/prisma.service'
 
@@ -36,6 +36,23 @@ export class UserService {
   async getAllUsers() {
     const users = await this.prisma.userDetails.findMany()
     return users
+  }
+
+  async getUserById(userIdParam: string) {
+    let userId: bigint
+    try {
+      userId = BigInt(userIdParam)
+    } catch (_e) {
+      throw new NotFoundException('User not found')
+    }
+
+    const user = await this.prisma.userDetails.findUnique({
+      where: { id: userId },
+    })
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+    return user
   }
 
   async signIn(input: { emailId: string; password: string }) {

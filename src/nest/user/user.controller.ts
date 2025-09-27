@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common'
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 import { UserService } from './user.service'
 import { CreateUserDto, SignInDto } from './user.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
@@ -40,6 +40,17 @@ export class UserController {
   async getAllUsers() {
     const users = await this.userService.getAllUsers()
     return { users }
+  }
+
+  // GET /api/v1/users/:userId
+  @UseGuards(JwtAuthGuard)
+  @Get(':userId')
+  @ApiOperation({ summary: 'Fetch a user by id' })
+  @ApiParam({ name: 'userId', required: true, description: 'User id as BigInt string' })
+  @ApiOkResponse({ description: 'User record', schema: { example: { user: { id: '1', created_at: '2025-09-27T12:34:56.789Z', firstName: 'John', lastName: 'Doe', emailId: 'john.doe@example.com' } } } })
+  async getUserById(@Param('userId') userId: string) {
+    const user = await this.userService.getUserById(userId)
+    return { user }
   }
 
   // POST /api/v1/users/signIn

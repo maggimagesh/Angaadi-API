@@ -2,11 +2,8 @@ import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './nest/app.module'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { BigIntSerializerInterceptor } from './nest/common/interceptors/bigint-serializer.interceptor'
-
-dotenv.config({ path: '.env.local' })
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false })

@@ -3,20 +3,43 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model userDetails {
-  id         BigInt   @id @default(autoincrement()) @db.BigInt
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  firstName  String?
-  lastName   String?
-  emailId    String?  @unique @db.VarChar
-  password   String?  @db.VarChar
+  id                   BigInt                @id @default(autoincrement())
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  firstName            String                @default("")
+  lastName             String                @default("")
+  emailId              String                @unique @default("") @db.VarChar
+  password             String                @db.VarChar
+  updated_at           DateTime?             @db.Timestamptz(6)
+  preferredDepartments PreferredDepartment[]
 
   @@map("userDetails")
 }
 
+model Gender {
+  id          BigInt                @id @default(autoincrement())
+  gender      String                @unique
+  created_at  DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?             @db.Timestamptz(6)
+  preferredBy PreferredDepartment[]
 
+  @@map("gender")
+}
+
+model PreferredDepartment {
+  id         BigInt       @id @default(autoincrement())
+  userId     BigInt?
+  genderId   BigInt?
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?    @db.Timestamptz(6)
+  isActive   Int          @default(1) @db.SmallInt
+  gender     Gender?      @relation(fields: [genderId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  user       userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@map("preferredDepartment")
+}
