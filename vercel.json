@@ -1,12 +1,10 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*": {
-      "runtime": "vercel-nodejs@3.0.0"
-    }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index.ts" }
+  "builds": [
+    { "src": "api/index.ts", "use": "@vercel/node@3.0.0" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/api/index.ts" }
   ]
 }
 
