@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/**/*": {
+      "runtime": "vercel-nodejs@3.0.0"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index.ts" }
   ]
