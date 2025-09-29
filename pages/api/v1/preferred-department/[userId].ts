@@ -15,7 +15,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     
     if (req.method === 'GET') {
       const preference = await preferredDepartmentService.getLatestPreferredDepartmentByUserId(userId)
-      return res.status(200).json(serializeBigInt({ preference: preference ?? {} }))
+      // Handle the case where preference is null (no records found)
+      const response = preference ? serializeBigInt({ preference }) : { preference: null }
+      return res.status(200).json(response)
     } else if (req.method === 'PUT') {
       await preferredDepartmentService.deactivateByUserId(userId)
       return res.status(200).json({ message: 'The gender has been removed successfully' })

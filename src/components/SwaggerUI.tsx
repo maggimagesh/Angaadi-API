@@ -399,6 +399,93 @@ export default function SwaggerUIComponent() {
             }
           }
         }
+      },
+      "/api/v1/users/physical-stats": {
+        post: {
+          summary: "Store user physical stats (height and weight)",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["heightUnit", "weightUnit", "heightValue", "weightValue"],
+                  properties: {
+                    heightUnit: { type: "string", enum: ["cm", "ft"], example: "cm" },
+                    weightUnit: { type: "string", enum: ["kg", "lb"], example: "kg" },
+                    heightValue: { type: "number", example: 175.5 },
+                    weightValue: { type: "number", example: 70.2 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Physical stats stored successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      stats: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", example: "1" },
+                          userId: { type: "string", example: "15" },
+                          heightCm: { type: "number", example: 175.5 },
+                          heightFt: { type: "number", example: null },
+                          weightKg: { type: "number", example: 70.2 },
+                          weightLb: { type: "number", example: null },
+                          created_at: { type: "string", example: "2025-09-27T12:34:56.789Z" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        get: {
+          summary: "Fetch latest physical stats for the authenticated user",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          responses: {
+            200: {
+              description: "Latest physical stats",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      stats: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", example: "1" },
+                          userId: { type: "string", example: "15" },
+                          heightCm: { type: "number", example: 175.5 },
+                          heightFt: { type: "number", example: null },
+                          weightKg: { type: "number", example: 70.2 },
+                          weightLb: { type: "number", example: null },
+                          created_at: { type: "string", example: "2025-09-27T12:34:56.789Z" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };
