@@ -6,6 +6,12 @@ dist/
 build/
 out/
 
+# Next.js
+.next/
+.next/cache/
+.next/server/
+.next/static/
+
 # TypeScript
 *.tsbuildinfo
 
@@ -61,3 +67,4 @@ prisma/*.db-journal
 *.tgz
 
 .env.local
+src/components/SwaggerUI.tsx
