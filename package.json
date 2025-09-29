@@ -1,7 +1,7 @@
 {
   "name": "Angaadi API",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
   "author": "Magesh Kumar A T",
   "scripts": {
     "prisma:generate": "prisma generate",
@@ -18,19 +18,19 @@
     "@nestjs/core": "^11.0.2",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-express": "11.0.2",
+    "@nestjs/platform-express": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
     "@prisma/client": "^6.16.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "4.21.2",
+    "express": "^5.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^5.0.1",
+    "swagger-ui-express": "^5.1.0",
     "serverless-http": "^3.2.0",
     "zod": "^3.23.8"
   },
@@ -41,11 +41,6 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "~5.8.3"
-  },
-  "overrides": {
-    "@nestjs/platform-express": {
-      "express": "4.21.2"
-    }
   },
   "engines": {
     "node": "20.x"
