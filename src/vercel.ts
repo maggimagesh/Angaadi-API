@@ -17,6 +17,12 @@ async function bootstrapServer() {
 
   try {
     const expressInstance = express()
+    
+    // Add a simple health check route before initializing the full app
+    expressInstance.use('/health', (req, res) => {
+      res.status(200).json({ status: 'OK', message: 'Serverless function is running' })
+    })
+
     const app = await NestFactory.create(AppModule, new ExpressAdapter(expressInstance), { cors: false })
 
     app.use(cors({ 
@@ -44,7 +50,7 @@ async function bootstrapServer() {
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
       .build()
     const document = SwaggerModule.createDocument(app, swaggerConfig)
-    SwaggerModule.setup('docs', app, document) // Changed to 'docs' to avoid conflicts with API routes
+    SwaggerModule.setup('docs', app, document)
 
     await app.init()
 
@@ -54,7 +60,21 @@ async function bootstrapServer() {
     return cachedServer
   } catch (error) {
     console.error('Error during server bootstrap:', error)
-    throw error
+    console.error('Stack:', error.stack)
+    
+    // In case of failure during bootstrap, return a server that handles errors gracefully
+    const expressInstance = express()
+    expressInstance.use((req, res) => {
+      res.status(500).json({
+        error: 'Server bootstrap failed',
+        message: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { stack: error.stack } : {})
+      })
+    })
+    
+    return serverlessHttp(expressInstance, {
+      binary: ['application/octet-stream', 'image/*'],
+    })
   }
 }
 
