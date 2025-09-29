@@ -67,4 +67,3 @@ prisma/*.db-journal
 *.tgz
 
 .env.local
-src/components/SwaggerUI.tsx
