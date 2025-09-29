@@ -16,7 +16,20 @@ async function bootstrapServer() {
   const expressInstance = express()
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressInstance), { cors: false })
 
-  app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' }))
+  app.use(cors({ 
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://angaadi-ui.vercel.app',
+      'https://angaadi.vercel.app',
+      'https://angaadi-frontend.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+  }))
   app.setGlobalPrefix('api/v1')
 
   await app.init()
