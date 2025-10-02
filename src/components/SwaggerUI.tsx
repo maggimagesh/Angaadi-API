@@ -486,6 +486,399 @@ export default function SwaggerUIComponent() {
             }
           }
         }
+      },
+      "/api/v1/age-group": {
+        get: {
+          summary: "Fetch all available age groups",
+          description: "Returns a list of all age groups (18-20, 21-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50-54, 55-59, 60-64, 65+)",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          responses: {
+            200: {
+              description: "List of age groups",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ageGroups: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", example: "1" },
+                            ageRange: { type: "string", example: "25-29" },
+                            minAge: { type: "number", example: 25, nullable: true },
+                            maxAge: { type: "number", example: 29, nullable: true },
+                            created_at: { type: "string", example: "2025-10-02T12:34:56.789Z" },
+                            updated_at: { type: "string", example: null, nullable: true }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            401: {
+              description: "Unauthorized - Invalid or missing JWT token",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Unauthorized" }
+                    }
+                  }
+                }
+              }
+            },
+            500: {
+              description: "Internal server error",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Internal server error" },
+                      details: { type: "string", example: "An unexpected error occurred" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        post: {
+          summary: "Save user's age group preference",
+          description: "Allows a user to select their age group. If the user already has an active age group, it will be deactivated before saving the new one.",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["userId", "ageGroupId"],
+                  properties: {
+                    userId: { 
+                      type: "string", 
+                      example: "15",
+                      description: "The ID of the user" 
+                    },
+                    ageGroupId: { 
+                      type: "string", 
+                      example: "3",
+                      description: "The ID of the age group to save" 
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Age group saved successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      userAgeGroup: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", example: "1" },
+                          userId: { type: "string", example: "15" },
+                          ageGroupId: { type: "string", example: "3" },
+                          isActive: { type: "number", example: 1 },
+                          created_at: { type: "string", example: "2025-10-02T12:34:56.789Z" },
+                          updated_at: { type: "string", example: null, nullable: true }
+                        }
+                      },
+                      message: { type: "string", example: "Age group saved successfully" }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request - Missing or invalid parameters",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Missing required fields" },
+                      details: { type: "string", example: "userId and ageGroupId are required" }
+                    }
+                  }
+                }
+              }
+            },
+            401: {
+              description: "Unauthorized - Invalid or missing JWT token",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Unauthorized" }
+                    }
+                  }
+                }
+              }
+            },
+            404: {
+              description: "Not found - Invalid user ID or age group ID",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Age group not found" },
+                      details: { type: "string", example: "Invalid age group ID" }
+                    }
+                  }
+                }
+              }
+            },
+            409: {
+              description: "Conflict - Age group already selected",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Conflict" },
+                      details: { type: "string", example: "This age group is already selected for the user" }
+                    }
+                  }
+                }
+              }
+            },
+            500: {
+              description: "Internal server error",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Internal server error" },
+                      details: { type: "string", example: "An unexpected error occurred" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/age-group/{userId}": {
+        get: {
+          summary: "Fetch user's active age group",
+          description: "Returns the currently active age group for the specified user",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "User ID as a string",
+              schema: { type: "string", example: "15" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "User's active age group",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      userAgeGroup: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", example: "1" },
+                          userId: { type: "string", example: "15" },
+                          ageGroupId: { type: "string", example: "3" },
+                          isActive: { type: "number", example: 1 },
+                          created_at: { type: "string", example: "2025-10-02T12:34:56.789Z" },
+                          updated_at: { type: "string", example: null, nullable: true },
+                          ageGroup: {
+                            type: "object",
+                            nullable: true,
+                            properties: {
+                              id: { type: "string", example: "3" },
+                              ageRange: { type: "string", example: "25-29" },
+                              minAge: { type: "number", example: 25, nullable: true },
+                              maxAge: { type: "number", example: 29, nullable: true },
+                              created_at: { type: "string", example: "2025-10-02T12:34:56.789Z" },
+                              updated_at: { type: "string", example: null, nullable: true }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request - Invalid userId parameter",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Invalid userId" },
+                      details: { type: "string", example: "userId must be a positive number" }
+                    }
+                  }
+                }
+              }
+            },
+            401: {
+              description: "Unauthorized - Invalid or missing JWT token",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Unauthorized" }
+                    }
+                  }
+                }
+              }
+            },
+            404: {
+              description: "Not found - No active age group for this user",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Not found" },
+                      details: { type: "string", example: "No active age group found for this user" }
+                    }
+                  }
+                }
+              }
+            },
+            500: {
+              description: "Internal server error",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Internal server error" },
+                      details: { type: "string", example: "An unexpected error occurred" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        delete: {
+          summary: "Deactivate user's age group",
+          description: "Deactivates the currently active age group for the specified user",
+          security: [
+            {
+              bearerAuth: []
+            }
+          ],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "User ID as a string",
+              schema: { type: "string", example: "15" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Age group deactivated successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      message: { type: "string", example: "Age group has been removed successfully" }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request - Invalid userId parameter",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Invalid userId" },
+                      details: { type: "string", example: "userId must be a positive number" }
+                    }
+                  }
+                }
+              }
+            },
+            401: {
+              description: "Unauthorized - Invalid or missing JWT token",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Unauthorized" }
+                    }
+                  }
+                }
+              }
+            },
+            404: {
+              description: "Not found - No active age group to deactivate",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Not found" },
+                      details: { type: "string", example: "No active age group found for this user" }
+                    }
+                  }
+                }
+              }
+            },
+            500: {
+              description: "Internal server error",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Internal server error" },
+                      details: { type: "string", example: "An unexpected error occurred" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };

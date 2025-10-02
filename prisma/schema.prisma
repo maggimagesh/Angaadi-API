@@ -18,6 +18,7 @@ model userDetails {
   updated_at           DateTime?             @db.Timestamptz(6)
   preferredDepartments PreferredDepartment[]
   userPhysicalStats    userPhysicalStats[]
+  userAgeGroups        UserAgeGroup[]
 
   @@map("userDetails")
 }
@@ -56,4 +57,29 @@ model userPhysicalStats {
   created_at  DateTime     @default(now()) @db.Timestamptz(6)
   updated_at  DateTime?    @db.Timestamptz(6)
   userDetails userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+
+model AgeGroup {
+  id            BigInt         @id @default(autoincrement())
+  ageRange      String         @unique
+  minAge        Int?
+  maxAge        Int?
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?      @db.Timestamptz(6)
+  userAgeGroups UserAgeGroup[]
+
+  @@map("ageGroup")
+}
+
+model UserAgeGroup {
+  id          BigInt       @id @default(autoincrement())
+  userId      BigInt?
+  ageGroupId  BigInt?
+  created_at  DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?    @db.Timestamptz(6)
+  isActive    Int          @default(1) @db.SmallInt
+  ageGroup    AgeGroup?    @relation(fields: [ageGroupId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  user        userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@map("userAgeGroup")
 }
