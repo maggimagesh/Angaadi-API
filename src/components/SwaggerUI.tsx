@@ -879,6 +879,163 @@ export default function SwaggerUIComponent() {
             }
           }
         }
+      },
+      "/api/v1/fit-attributes": {
+        get: {
+          summary: "Fetch all fit attributes",
+          description: "Returns a list of all available fit attributes, optionally filtered by category (mens or womens)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "category",
+              in: "query",
+              required: false,
+              description: "Filter by category (mens or womens)",
+              schema: { type: "string", enum: ["mens", "womens"], example: "womens" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "List of fit attributes",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      fitAttributes: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", example: "1" },
+                            name: { type: "string", example: "Bust" },
+                            category: { type: "string", example: "womens" },
+                            displayOrder: { type: "number", example: 1, nullable: true },
+                            created_at: { type: "string" },
+                            updated_at: { type: "string", nullable: true }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string" },
+                      details: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        },
+        post: {
+          summary: "Save user fit attribute(s)",
+          description: "Save single or multiple fit attributes for a user",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    {
+                      type: "object",
+                      required: ["userId", "fitAttributeId", "value"],
+                      properties: {
+                        userId: { type: "string", example: "15" },
+                        fitAttributeId: { type: "string", example: "1" },
+                        value: { type: "string", example: "34" }
+                      }
+                    },
+                    {
+                      type: "object",
+                      required: ["userId", "attributes"],
+                      properties: {
+                        userId: { type: "string", example: "15" },
+                        attributes: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              fitAttributeId: { type: "string" },
+                              value: { type: "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: "Success" },
+            400: { description: "Bad request" },
+            401: { description: "Unauthorized" },
+            404: { description: "Not found" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/fit-attributes/{userId}": {
+        get: {
+          summary: "Fetch user's fit attributes",
+          description: "Returns all active fit attributes for the specified user",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "15" }
+            }
+          ],
+          responses: {
+            200: { description: "User's fit attributes" },
+            400: { description: "Bad request" },
+            401: { description: "Unauthorized" },
+            404: { description: "Not found" },
+            500: { description: "Internal server error" }
+          }
+        },
+        delete: {
+          summary: "Delete user's fit attribute(s)",
+          description: "Delete specific or all fit attributes for a user",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "15" }
+            },
+            {
+              name: "fitAttributeId",
+              in: "query",
+              required: false,
+              schema: { type: "string", example: "1" }
+            }
+          ],
+          responses: {
+            200: { description: "Deleted successfully" },
+            400: { description: "Bad request" },
+            401: { description: "Unauthorized" },
+            404: { description: "Not found" },
+            500: { description: "Internal server error" }
+          }
+        }
       }
     }
   };
