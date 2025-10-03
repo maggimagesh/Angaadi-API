@@ -5,52 +5,49 @@ const prisma = new PrismaClient()
 async function seedFitAttributes() {
   console.log('🌱 Seeding fit attributes...')
 
-  // Women's fit attributes
-  const womensFitAttributes = [
-    { name: 'Bust', category: 'womens', displayOrder: 1 },
-    { name: 'Waist', category: 'womens', displayOrder: 2 },
-    { name: 'Hips', category: 'womens', displayOrder: 3 },
-    { name: 'Inseam', category: 'womens', displayOrder: 4 },
-    { name: 'Shoulder Width', category: 'womens', displayOrder: 5 },
-    { name: 'Sleeve Length', category: 'womens', displayOrder: 6 },
-    { name: 'Cup Size', category: 'womens', displayOrder: 7 },
-    { name: 'Rise', category: 'womens', displayOrder: 8 },
-    { name: 'Thigh', category: 'womens', displayOrder: 9 },
-    { name: 'Neck', category: 'womens', displayOrder: 10 },
+  // Define fit attributes with their optional values
+  const fitAttributes = [
+    // Shoulders attributes (IDs 1-3)
+    { id: 1, attributeName: 'Shoulders', optionValue: 'Narrow' },
+    { id: 2, attributeName: 'Shoulders', optionValue: 'Average' },
+    { id: 3, attributeName: 'Shoulders', optionValue: 'Wide' },
+    
+    // Waist attributes (IDs 4-6)
+    { id: 4, attributeName: 'Waist', optionValue: 'Narrow' },
+    { id: 5, attributeName: 'Waist', optionValue: 'Average' },
+    { id: 6, attributeName: 'Waist', optionValue: 'Wide' },
+    
+    // Thighs/Legs attributes (IDs 7-9)
+    { id: 7, attributeName: 'Thighs/Legs', optionValue: 'Narrow' },
+    { id: 8, attributeName: 'Thighs/Legs', optionValue: 'Average' },
+    { id: 9, attributeName: 'Thighs/Legs', optionValue: 'Wide' },
+    
+    // Hips attributes (IDs 10-12)
+    { id: 10, attributeName: 'Hips', optionValue: 'Narrow' },
+    { id: 11, attributeName: 'Hips', optionValue: 'Average' },
+    { id: 12, attributeName: 'Hips', optionValue: 'Wide' },
   ]
 
-  // Men's fit attributes
-  const mensFitAttributes = [
-    { name: 'Chest', category: 'mens', displayOrder: 1 },
-    { name: 'Waist', category: 'mens', displayOrder: 2 },
-    { name: 'Inseam', category: 'mens', displayOrder: 3 },
-    { name: 'Shoulder Width', category: 'mens', displayOrder: 4 },
-    { name: 'Sleeve Length', category: 'mens', displayOrder: 5 },
-    { name: 'Neck', category: 'mens', displayOrder: 6 },
-    { name: 'Rise', category: 'mens', displayOrder: 7 },
-    { name: 'Thigh', category: 'mens', displayOrder: 8 },
-    { name: 'Hip', category: 'mens', displayOrder: 9 },
-    { name: 'Outseam', category: 'mens', displayOrder: 10 },
-  ]
-
-  const allAttributes = [...womensFitAttributes, ...mensFitAttributes]
-
-  for (const attr of allAttributes) {
+  for (const attr of fitAttributes) {
     try {
       const existing = await prisma.fitAttribute.findUnique({
-        where: { name: attr.name },
+        where: { id: attr.id },
       })
 
       if (existing) {
-        console.log(`⏭️  Fit attribute '${attr.name}' already exists, skipping...`)
+        console.log(`⏭️  Fit attribute ID ${attr.id} '${attr.attributeName} - ${attr.optionValue}' already exists, skipping...`)
       } else {
         await prisma.fitAttribute.create({
-          data: attr,
+          data: {
+            id: attr.id,
+            attributeName: attr.attributeName,
+            optionValue: attr.optionValue,
+          },
         })
-        console.log(`✅ Created fit attribute: ${attr.name} (${attr.category})`)
+        console.log(`✅ Created fit attribute: ${attr.attributeName} - ${attr.optionValue} (ID: ${attr.id})`)
       }
     } catch (error) {
-      console.error(`❌ Error creating fit attribute '${attr.name}':`, error)
+      console.error(`❌ Error creating fit attribute '${attr.attributeName} - ${attr.optionValue}':`, error)
     }
   }
 
@@ -69,4 +66,3 @@ async function main() {
 }
 
 main()
-

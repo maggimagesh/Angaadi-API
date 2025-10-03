@@ -17,9 +17,9 @@ model userDetails {
   password             String                @db.VarChar
   updated_at           DateTime?             @db.Timestamptz(6)
   preferredDepartments PreferredDepartment[]
-  userPhysicalStats    userPhysicalStats[]
   userAgeGroups        UserAgeGroup[]
-  userFitAttributes    UserFitAttribute[]
+  userFitAttributes    userFitAttributes[]
+  userPhysicalStats    userPhysicalStats[]
 
   @@map("userDetails")
 }
@@ -73,40 +73,43 @@ model AgeGroup {
 }
 
 model UserAgeGroup {
-  id          BigInt       @id @default(autoincrement())
-  userId      BigInt?
-  ageGroupId  BigInt?
-  created_at  DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime?    @db.Timestamptz(6)
-  isActive    Int          @default(1) @db.SmallInt
-  ageGroup    AgeGroup?    @relation(fields: [ageGroupId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  user        userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id         BigInt       @id @default(autoincrement())
+  userId     BigInt?
+  ageGroupId BigInt?
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?    @db.Timestamptz(6)
+  isActive   Int          @default(1) @db.SmallInt
+  ageGroup   AgeGroup?    @relation(fields: [ageGroupId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  user       userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@map("userAgeGroup")
 }
 
-model FitAttribute {
-  id                BigInt              @id @default(autoincrement())
-  name              String              @unique
-  category          String              @db.VarChar // 'mens' or 'womens'
-  displayOrder      Int?                @default(0)
-  created_at        DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime?           @db.Timestamptz(6)
-  userFitAttributes UserFitAttribute[]
-
-  @@map("fitAttribute")
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fitAttribute {
+  id                                                           Int                 @id(map: "fitattribute_pkey") @default(autoincrement())
+  attributeName                                                String
+  optionValue                                                  String              @db.VarChar(50)
+  userFitAttributes_userFitAttributes_hipsIdTofitAttribute     userFitAttributes[] @relation("userFitAttributes_hipsIdTofitAttribute")
+  userFitAttributes_userFitAttributes_shoulderIdTofitAttribute userFitAttributes[] @relation("userFitAttributes_shoulderIdTofitAttribute")
+  userFitAttributes_userFitAttributes_thighsIdTofitAttribute   userFitAttributes[] @relation("userFitAttributes_thighsIdTofitAttribute")
+  userFitAttributes_userFitAttributes_waistIdTofitAttribute    userFitAttributes[] @relation("userFitAttributes_waistIdTofitAttribute")
 }
 
-model UserFitAttribute {
-  id             BigInt        @id @default(autoincrement())
-  userId         BigInt?
-  fitAttributeId BigInt?
-  value          String?       @db.VarChar // The value/measurement for this attribute
-  created_at     DateTime      @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime?     @db.Timestamptz(6)
-  isActive       Int           @default(1) @db.SmallInt
-  fitAttribute   FitAttribute? @relation(fields: [fitAttributeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  user           userDetails?  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@map("userFitAttribute")
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model userFitAttributes {
+  id                                                      Int           @id(map: "userfitattributes_pkey") @default(autoincrement())
+  userId                                                  BigInt
+  shoulderId                                              Int?
+  waistId                                                 Int?
+  thighsId                                                Int?
+  hipsId                                                  Int?
+  created_at                                              DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at                                              DateTime?     @db.Timestamptz(6)
+  isActive                                                Boolean       @default(true)
+  fitAttribute_userFitAttributes_hipsIdTofitAttribute     fitAttribute? @relation("userFitAttributes_hipsIdTofitAttribute", fields: [hipsId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  fitAttribute_userFitAttributes_shoulderIdTofitAttribute fitAttribute? @relation("userFitAttributes_shoulderIdTofitAttribute", fields: [shoulderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  fitAttribute_userFitAttributes_thighsIdTofitAttribute   fitAttribute? @relation("userFitAttributes_thighsIdTofitAttribute", fields: [thighsId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userDetails                                             userDetails   @relation(fields: [userId], references: [id], onUpdate: NoAction)
+  fitAttribute_userFitAttributes_waistIdTofitAttribute    fitAttribute? @relation("userFitAttributes_waistIdTofitAttribute", fields: [waistId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

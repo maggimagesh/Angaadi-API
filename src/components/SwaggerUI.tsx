@@ -883,36 +883,32 @@ export default function SwaggerUIComponent() {
       "/api/v1/fit-attributes": {
         get: {
           summary: "Fetch all fit attributes",
-          description: "Returns a list of all available fit attributes, optionally filtered by category (mens or womens)",
+          description: "Returns a list of all available fit attributes grouped by attribute name",
           security: [{ bearerAuth: [] }],
-          parameters: [
-            {
-              name: "category",
-              in: "query",
-              required: false,
-              description: "Filter by category (mens or womens)",
-              schema: { type: "string", enum: ["mens", "womens"], example: "womens" }
-            }
-          ],
           responses: {
             200: {
-              description: "List of fit attributes",
+              description: "List of fit attributes grouped by attribute name",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
                     properties: {
-                      fitAttributes: {
+                      data: {
                         type: "array",
                         items: {
                           type: "object",
                           properties: {
-                            id: { type: "string", example: "1" },
-                            name: { type: "string", example: "Bust" },
-                            category: { type: "string", example: "womens" },
-                            displayOrder: { type: "number", example: 1, nullable: true },
-                            created_at: { type: "string" },
-                            updated_at: { type: "string", nullable: true }
+                            attributeName: { type: "string", example: "Shoulders" },
+                            options: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "number", example: 1 },
+                                  value: { type: "string", example: "Narrow" }
+                                }
+                              }
+                            }
                           }
                         }
                       }

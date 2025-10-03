@@ -4,7 +4,7 @@ import { withAuth } from '@/middleware/auth'
 import { serializeBigInt } from '@/utils/serialize'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId, fitAttributeId } = req.query
+  const { userId } = req.query
   const fitAttributeService = new FitAttributeService()
 
   // Validate userId
@@ -24,10 +24,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     if (req.method === 'GET') {
-      // Get all fit attributes for a user
+      // Get fit attributes for a user
       const userFitAttributes = await fitAttributeService.getUserFitAttributes(userId)
 
-      if (userFitAttributes.length === 0) {
+      if (!userFitAttributes) {
         return res.status(404).json({ 
           error: 'Not found',
           details: 'No fit attributes found for this user'
@@ -38,29 +38,67 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } 
     
     else if (req.method === 'DELETE') {
-      // Delete fit attribute(s) for a user
-      if (fitAttributeId && typeof fitAttributeId === 'string') {
-        // Delete a specific fit attribute
-        if (isNaN(Number(fitAttributeId)) || Number(fitAttributeId) <= 0) {
-          return res.status(400).json({ 
-            error: 'Invalid fitAttributeId',
-            details: 'fitAttributeId must be a positive number'
-          })
-        }
+      // Delete fit attributes for a user
+      await fitAttributeService.deleteUserFitAttributes(userId)
+      
+      return res.status(200).json({ 
+        message: 'Fit attributes have been removed successfully'
+      })
+    } 
+    
+    else if (req.method === 'PUT' || req.method === 'PATCH') {
+      // Update fit attributes for a user
+      const { shouldersId, waistId, thighsId, hipsId } = req.body
 
-        await fitAttributeService.deleteUserFitAttribute(userId, fitAttributeId)
-        
-        return res.status(200).json({ 
-          message: 'Fit attribute has been removed successfully'
-        })
-      } else {
-        // Delete all fit attributes for the user
-        await fitAttributeService.deleteAllUserFitAttributes(userId)
-        
-        return res.status(200).json({ 
-          message: 'All fit attributes have been removed successfully'
+      // Validate that at least one attribute is provided
+      if (!shouldersId && !waistId && !thighsId && !hipsId) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          details: 'At least one fit attribute (shouldersId, waistId, thighsId, or hipsId) must be provided'
         })
       }
+
+      // Validate provided IDs
+      if (shouldersId && (isNaN(Number(shouldersId)) || Number(shouldersId) <= 0)) {
+        return res.status(400).json({ 
+          error: 'Invalid shouldersId',
+          details: 'shouldersId must be a positive number'
+        })
+      }
+
+      if (waistId && (isNaN(Number(waistId)) || Number(waistId) <= 0)) {
+        return res.status(400).json({ 
+          error: 'Invalid waistId',
+          details: 'waistId must be a positive number'
+        })
+      }
+
+      if (thighsId && (isNaN(Number(thighsId)) || Number(thighsId) <= 0)) {
+        return res.status(400).json({ 
+          error: 'Invalid thighsId',
+          details: 'thighsId must be a positive number'
+        })
+      }
+
+      if (hipsId && (isNaN(Number(hipsId)) || Number(hipsId) <= 0)) {
+        return res.status(400).json({ 
+          error: 'Invalid hipsId',
+          details: 'hipsId must be a positive number'
+        })
+      }
+
+      const userFitAttributes = await fitAttributeService.saveUserFitAttributes({
+        userId,
+        shouldersId,
+        waistId,
+        thighsId,
+        hipsId,
+      })
+
+      return res.status(200).json(serializeBigInt({ 
+        userFitAttributes,
+        message: 'Fit attributes updated successfully'
+      }))
     } 
     
     else {
@@ -70,7 +108,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     console.error('Fit attributes API error:', error)
     
     // Handle specific error cases
-    if (error.message === 'User fit attribute not found') {
+    if (error.message === 'User fit attributes not found') {
       return res.status(404).json({ 
         error: 'Not found',
         details: error.message
@@ -92,4 +130,3 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 export default withAuth(handler)
-
