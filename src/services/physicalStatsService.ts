@@ -95,4 +95,25 @@ export class PhysicalStatsService {
       userId: record.userId!
     }
   }
+
+  async deletePhysicalStats(userId: bigint): Promise<void> {
+    const record = await prisma.userPhysicalStats.findFirst({
+      where: {
+        userId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    })
+
+    if (!record) {
+      throw new Error('No physical stats found for this user')
+    }
+
+    await prisma.userPhysicalStats.delete({
+      where: {
+        id: record.id
+      }
+    })
+  }
 }

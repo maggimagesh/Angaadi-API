@@ -39,6 +39,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const stats = await physicalStatsService.getLatestPhysicalStats(userId)
 
       return res.status(200).json(serializeBigInt({ stats: stats ?? null }))
+    } else if (req.method === 'DELETE') {
+      // Handle deleting physical stats
+      try {
+        const physicalStatsService = new PhysicalStatsService()
+        await physicalStatsService.deletePhysicalStats(userId)
+        return res.status(200).json({ message: 'Physical stats deleted successfully' })
+      } catch (error: any) {
+        if (error.message === 'No physical stats found for this user') {
+          return res.status(404).json({
+            error: 'Not found',
+            details: error.message
+          })
+        }
+        throw error
+      }
     } else {
       return res.status(405).json({ error: 'Method not allowed' })
     }
