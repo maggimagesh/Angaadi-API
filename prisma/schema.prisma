@@ -16,6 +16,7 @@ model userDetails {
   emailId              String                @unique @default("") @db.VarChar
   password             String                @db.VarChar
   updated_at           DateTime?             @db.Timestamptz(6)
+  UserShoeSize         UserShoeSize[]
   preferredDepartments PreferredDepartment[]
   userAgeGroups        UserAgeGroup[]
   userFitAttributes    userFitAttributes[]
@@ -112,4 +113,26 @@ model userFitAttributes {
   fitAttribute_userFitAttributes_thighsIdTofitAttribute   fitAttribute? @relation("userFitAttributes_thighsIdTofitAttribute", fields: [thighsId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   userDetails                                             userDetails   @relation(fields: [userId], references: [id], onUpdate: NoAction)
   fitAttribute_userFitAttributes_waistIdTofitAttribute    fitAttribute? @relation("userFitAttributes_waistIdTofitAttribute", fields: [waistId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model UserShoeSize {
+  id          BigInt       @id @default(autoincrement())
+  created_at  DateTime     @default(now()) @db.Timestamptz(6)
+  userId      BigInt?
+  shoeSizeId  Int?
+  updated_at  DateTime?    @db.Timestamptz(6)
+  isActive    Int?         @default(1) @db.SmallInt
+  shoeSize    shoeSize?    @relation(fields: [shoeSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  userDetails userDetails? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model shoeSize {
+  id           Int            @id(map: "shoesize_pkey") @default(autoincrement())
+  size         Decimal        @db.Decimal(4, 1)
+  width        String         @db.VarChar(20)
+  created_at   DateTime?      @default(now()) @db.Timestamp(6)
+  UserShoeSize UserShoeSize[]
 }
