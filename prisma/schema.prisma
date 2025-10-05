@@ -136,3 +136,19 @@ model shoeSize {
   created_at   DateTime?      @default(now()) @db.Timestamp(6)
   UserShoeSize UserShoeSize[]
 }
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model products {
+  id           Int       @id @default(autoincrement())
+  productname  String    @db.VarChar(100)
+  description  String    @db.VarChar(100)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  slug         String?   @unique @db.VarChar(150)
+  badge        String?   @default("Shop Now") @db.VarChar(100)
+  imageurl     String?
+  displayorder Int?      @default(0)
+  isactive     Boolean?  @default(true)
+  icon         String?   @db.VarChar(10)
+  productcount Int?      @default(0)
+  updated_at   DateTime? @default(now()) @db.Timestamp(6)
+}
