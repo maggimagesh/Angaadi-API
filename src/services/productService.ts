@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma'
 
 export interface Product {
   id: number
-  productname: string
+  categoryname: string
   description: string
   slug: string | null
   badge: string | null
@@ -17,7 +17,7 @@ export interface Product {
 
 export class ProductService {
   async getAllProducts(): Promise<Product[]> {
-    return await prisma.products.findMany({
+    return await prisma.categories.findMany({
       where: {
         isactive: true
       },
@@ -43,7 +43,7 @@ export class ProductService {
       throw new Error('Invalid product ID')
     }
 
-    const product = await prisma.products.findUnique({
+    const product = await prisma.categories.findUnique({
       where: { id: productId },
     })
     
