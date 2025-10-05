@@ -7,6 +7,7 @@ export const corsWithWhitelist = async (req: NextApiRequest, res: NextApiRespons
     'http://localhost:3000',
     'http://localhost:3001', 
     'http://localhost:5173', // Vite default port
+    'https://angaadi.vercel.app', // Your frontend domain
     'https://your-frontend-domain.vercel.app', // Add your actual frontend domain here
     'https://your-frontend-vercel.app' // Add your actual frontend domain here
   ];
