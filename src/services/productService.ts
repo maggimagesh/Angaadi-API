@@ -67,5 +67,21 @@ export class ProductService {
 
     return products
   }
+
+  async getProductByCategoryAndProductId(categoryId: number, productId: number) {
+    const product = await prisma.productsdata.findFirst({
+      where: {
+        id: productId,
+        categoryid: categoryId,
+        isactive: true
+      },
+      include: {
+        categories: true,
+        specifications: true
+      }
+    })
+
+    return product
+  }
 }
 
