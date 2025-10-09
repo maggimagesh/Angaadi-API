@@ -16,6 +16,7 @@ model userDetails {
   lastName             String                @default("")
   emailId              String                @unique @default("") @db.VarChar
   password             String                @db.VarChar
+  supabaseUserId       String?               @unique @db.VarChar
   updated_at           DateTime?             @db.Timestamptz(6)
   UserShoeSize         UserShoeSize[]
   cart                 cart[]
