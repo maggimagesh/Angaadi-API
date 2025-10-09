@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         weightValue,
       })
 
-      return res.status(200).json(serializeBigInt({ stats }))
+      return res.status(201).json(serializeBigInt({ stats }))
     } else if (req.method === 'GET') {
       // Handle retrieving physical stats
       const physicalStatsService = new PhysicalStatsService()

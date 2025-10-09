@@ -22,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: 'quantity must be a number' })
       }
       const cart = await service.addToCart(user.sub, { productId, quantity })
-      return res.status(200).json(serializeBigInt(cart))
+      return res.status(201).json(serializeBigInt(cart))
     }
 
     if (req.method === 'DELETE') {

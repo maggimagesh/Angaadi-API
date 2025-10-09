@@ -53,7 +53,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       try {
         const userAgeGroup = await ageGroupService.saveUserAgeGroup(input)
-        return res.status(200).json(serializeBigInt({ 
+        return res.status(201).json(serializeBigInt({ 
           userAgeGroup,
           message: 'Age group saved successfully' 
         }))

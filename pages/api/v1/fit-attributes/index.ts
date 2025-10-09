@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const userFitAttributes = await fitAttributeService.saveUserFitAttributesArray(input)
 
-      return res.status(200).json(serializeBigInt({ 
+      return res.status(201).json(serializeBigInt({ 
         userFitAttributes,
         message: 'Fit attributes saved successfully'
       }))
