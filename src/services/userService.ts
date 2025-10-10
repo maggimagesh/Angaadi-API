@@ -132,4 +132,16 @@ export class UserService {
       throw new Error('Failed to link OAuth user')
     }
   }
+
+  async updatePassword(userId: bigint, newPassword: string): Promise<User> {
+    try {
+      const user = await prisma.userDetails.update({
+        where: { id: userId },
+        data: { password: newPassword },
+      })
+      return user
+    } catch (error: any) {
+      throw new Error('Failed to update password')
+    }
+  }
 }

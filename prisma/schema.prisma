@@ -16,10 +16,11 @@ model userDetails {
   lastName             String                @default("")
   emailId              String                @unique @default("") @db.VarChar
   password             String                @db.VarChar
-  supabaseUserId       String?               @unique @db.VarChar
   updated_at           DateTime?             @db.Timestamptz(6)
+  supabaseUserId       String?               @unique @db.VarChar
   UserShoeSize         UserShoeSize[]
   cart                 cart[]
+  otp                  otp[]
   preferredDepartments PreferredDepartment[]
   userAgeGroups        UserAgeGroup[]
   userFitAttributes    userFitAttributes[]
@@ -596,6 +597,21 @@ model cart {
   created_at   DateTime      @default(now()) @db.Timestamptz(6)
   productsdata productsdata? @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   userDetails  userDetails?  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model otp {
+  id         BigInt       @id @default(autoincrement())
+  opts       String?
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  email      String?
+  userId     BigInt?
+  expiresAt  DateTime?    @db.Timestamptz(6)
+  used       Boolean?
+  resetToken String?
+  user       userDetails? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("public")
 }

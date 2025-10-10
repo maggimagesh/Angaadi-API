@@ -5,23 +5,25 @@ export const corsWithWhitelist = async (req: NextApiRequest, res: NextApiRespons
   // In production, replace with your actual frontend URL
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:3000',
-    'http://localhost:3001', 
-    'http://localhost:5173', // Vite default port
-    'https://angaadi.vercel.app', // Your frontend domain
-    'https://your-frontend-domain.vercel.app', // Add your actual frontend domain here
-    'https://your-frontend-vercel.app' // Add your actual frontend domain here
+    'http://localhost:3001',
+    'http://localhost:3300',
+    'http://localhost:5173',
+    'https://angaadi.vercel.app',
+    'https://angaadi.online'
   ];
   
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
+
+  // In development, allow all origins for easier development
+  if (process.env.NODE_ENV === 'development') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
-    // For non-matching origins in development, allow all; in production use a specific domain
-    if (process.env.NODE_ENV === 'development') {
-      res.setHeader('Access-Control-Allow-Origin', '*');
+    // In production, only allow specific origins
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Origin', origin);
     } else {
-      // In production, it's better to specify the exact origin rather than wildcard
       res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0] || '');
     }
   }
