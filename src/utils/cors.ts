@@ -19,26 +19,24 @@ export const corsWithWhitelist = async (req: NextApiRequest, res: NextApiRespons
     : defaultOrigins;
   
   const origin = req.headers.origin;
-  
-  // Debug logging for production
-  console.log(`CORS Debug - Origin: ${origin}, NODE_ENV: ${process.env.NODE_ENV}, Allowed Origins: ${allowedOrigins.join(', ')}`);
 
   // In development, allow all origins for easier development
   if (process.env.NODE_ENV === 'development') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    console.log('CORS: Development mode - allowing all origins');
   } else {
     // In production, only allow specific origins
     if (origin && allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Origin', origin);
-      console.log(`CORS: Production mode - allowing origin: ${origin}`);
+    } else if (!origin) {
+      // Handle requests without origin (like server-to-server or some mobile apps)
+      res.setHeader('Access-Control-Allow-Origin', '*');
     } else {
-      // If origin doesn't match, don't set Access-Control-Allow-Origin
-      // This will cause CORS to fail, which is the desired behavior for security
-      console.warn(`CORS: Origin ${origin} not allowed. Allowed origins: ${allowedOrigins.join(', ')}`);
-      res.setHeader('Access-Control-Allow-Origin', 'null');
+      // If origin doesn't match, allow the first default origin as fallback
+      // This prevents complete blocking while maintaining some security
+      const fallbackOrigin = allowedOrigins[0] || 'https://angaadi.online';
+      res.setHeader('Access-Control-Allow-Origin', fallbackOrigin);
     }
   }
   
