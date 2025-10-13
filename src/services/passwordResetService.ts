@@ -175,8 +175,7 @@ export class PasswordResetService {
     })
 
     if (!user) {
-      // Don't reveal if email exists or not for security
-      return { message: 'If an account with that email exists, a password reset OTP has been sent.' }
+      throw new Error('User not available')
     }
 
     // Create new OTP record (always create new, don't update existing)

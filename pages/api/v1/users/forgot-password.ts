@@ -26,6 +26,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.status(201).json(result)
   } catch (error: any) {
     console.error('Forgot password error:', error)
+    if (error.message === 'User not available') {
+      return res.status(404).json({ error: error.message })
+    }
     res.status(500).json({ error: 'Internal server error' })
   }
 }
