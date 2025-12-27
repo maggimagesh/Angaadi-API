@@ -34,10 +34,10 @@ async function main() {
         maxAge: ageGroup.maxAge,
       },
     });
-    console.log(`✓ Created/Updated age group: ${ageGroup.ageRange}`);
+    console.log(`Created/Updated age group: ${ageGroup.ageRange}`);
   }
 
-  console.log("✅ Seeding completed!");
+  console.log("Seeding completed!");
 }
 
 main()
