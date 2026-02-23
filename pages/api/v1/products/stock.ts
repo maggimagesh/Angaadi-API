@@ -22,9 +22,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const updatedProduct = await service.updateStock(String(productId), quantityChange)
+    const serialized = serializeBigInt(updatedProduct)
+
+    // Broadcast stock change to all connected WebSocket clients
+    const broadcast = (global as any).__wsBroadcast
+    if (typeof broadcast === 'function') {
+      broadcast({
+        type: req.method === 'POST' ? 'STOCK_ADDED' : 'STOCK_REDUCED',
+        product: serialized,
+      })
+    }
+
     return res.status(200).json({
       message: 'Stock updated successfully',
-      product: serializeBigInt(updatedProduct)
+      product: serialized
     })
   } catch (error: any) {
     const message = error?.message || 'Internal server error'
