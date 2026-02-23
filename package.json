@@ -4,9 +4,9 @@
   "private": true,
   "author": "Magesh Kumar A T",
   "scripts": {
-    "dev": "NODE_ENV=development node server.js",
+    "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "node server.js",
+    "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },

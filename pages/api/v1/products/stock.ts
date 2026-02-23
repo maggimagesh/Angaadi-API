@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '@/middleware/auth'
 import { ProductService } from '@/services/productService'
 import { serializeBigInt } from '@/utils/serialize'
+import { supabase } from '@/lib/supabase'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'PATCH') {
@@ -24,13 +25,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const updatedProduct = await service.updateStock(String(productId), quantityChange)
     const serialized = serializeBigInt(updatedProduct)
 
-    // Broadcast stock change to all connected WebSocket clients
-    const broadcast = (global as any).__wsBroadcast
-    if (typeof broadcast === 'function') {
-      broadcast({
-        type: req.method === 'POST' ? 'STOCK_ADDED' : 'STOCK_REDUCED',
-        product: serialized,
+    // Broadcast stock change via Supabase Realtime (works in dev + production)
+    try {
+      const channel = supabase.channel('stock-updates')
+      await new Promise<void>((resolve) => {
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'stock-change',
+              payload: {
+                type: req.method === 'POST' ? 'STOCK_ADDED' : 'STOCK_REDUCED',
+                product: serialized,
+              },
+            }).then(() => {
+              supabase.removeChannel(channel)
+              resolve()
+            })
+          }
+        })
       })
+    } catch (broadcastErr) {
+      // Don't fail the API call if broadcast fails
+      console.error('[Supabase Broadcast] Error:', broadcastErr)
     }
 
     return res.status(200).json({
@@ -45,3 +62,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 export default withAuth(handler)
+
