@@ -19,7 +19,7 @@ export default function SwaggerUIComponent() {
     },
     servers: [
       {
-        url: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+        url: typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
         description: "Current server"
       }
     ],
@@ -1029,6 +1029,124 @@ export default function SwaggerUIComponent() {
             400: { description: "Bad request" },
             401: { description: "Unauthorized" },
             404: { description: "Not found" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/products/stock": {
+        post: {
+          summary: "Update product stock",
+          description: "Increment or decrement a product's stock quantity",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["productId", "quantityChange"],
+                  properties: {
+                    productId: { type: "number", example: 1 },
+                    quantityChange: { type: "number", example: 5 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Stock updated successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      message: { type: "string", example: "Stock updated successfully" },
+                      product: {
+                        type: "object",
+                        properties: {
+                          id: { type: "number", example: 1 },
+                          productname: { type: "string", example: "Example Product" },
+                          stock: { type: "number", example: 15 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request - Invalid input or stock would fall below 0",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Stock cannot be reduced below 0" }
+                    }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        },
+        patch: {
+          summary: "Update product stock (Alias for POST)",
+          description: "Increment or decrement a product's stock quantity",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["productId", "quantityChange"],
+                  properties: {
+                    productId: { type: "number", example: 1 },
+                    quantityChange: { type: "number", example: -2 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Stock updated successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      message: { type: "string", example: "Stock updated successfully" },
+                      product: {
+                        type: "object",
+                        properties: {
+                          id: { type: "number", example: 1 },
+                          productname: { type: "string", example: "Example Product" },
+                          stock: { type: "number", example: 13 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Bad request - Invalid input or stock would fall below 0",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Stock cannot be reduced below 0" }
+                    }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
             500: { description: "Internal server error" }
           }
         }

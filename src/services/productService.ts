@@ -83,5 +83,43 @@ export class ProductService {
 
     return product
   }
+
+  async updateStock(productIdParam: string, quantityChange: number) {
+    let productId: number
+    try {
+      productId = parseInt(productIdParam)
+      if (isNaN(productId)) {
+        throw new Error('Invalid product ID')
+      }
+    } catch (_e) {
+      throw new Error('Invalid product ID')
+    }
+
+    if (isNaN(quantityChange)) {
+      throw new Error('Invalid quantity change')
+    }
+
+    const product = await prisma.productsdata.findUnique({
+      where: { id: productId },
+    })
+    
+    if (!product) {
+      throw new Error('Product not found')
+    }
+
+    const currentStock = product.stock ?? 0
+    const newStock = currentStock + quantityChange
+
+    if (newStock < 0) {
+      throw new Error('Stock cannot be reduced below 0')
+    }
+
+    const updatedProduct = await prisma.productsdata.update({
+      where: { id: productId },
+      data: { stock: newStock }
+    })
+
+    return updatedProduct
+  }
 }
 
