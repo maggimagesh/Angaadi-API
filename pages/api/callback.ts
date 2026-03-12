@@ -7,16 +7,37 @@ const BASE_OUTPUT_DIR = path.join(process.cwd(), 'data', 'callback_OP');
 
 export const config = {
     api: {
-        bodyParser: {
-            sizeLimit: '200mb',
-        },
+        bodyParser: false,
+        externalResolver: true,
     },
+};
+
+const getRawBody = (req: any): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', (chunk: Buffer) => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            resolve(body);
+        });
+        req.on('error', (err: any) => {
+            reject(err);
+        });
+    });
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
         try {
-            const body = req.body;
+            const rawBody = await getRawBody(req);
+            let body;
+            try {
+                body = JSON.parse(rawBody);
+            } catch (e) {
+                return res.status(400).send("Invalid JSON");
+            }
+            
             const recordId = body?.responseSet?.[0]?.recordId;
 
             if (!recordId) {
