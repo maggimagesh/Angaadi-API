@@ -1,0 +1,8 @@
+{
+    "responseSet": [
+        {
+            "recordId": "test_record_1"
+        }
+    ],
+    "data": "some sample data"
+}
