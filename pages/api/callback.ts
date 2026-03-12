@@ -2,69 +2,70 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { pipeline } from 'stream/promises';
 
 const BASE_OUTPUT_DIR = path.join(process.cwd(), 'data', 'callback_OP');
+const TEMP_DIR = path.join(process.cwd(), 'data', 'temp');
+
+// Ensure directories exist
+if (!fs.existsSync(BASE_OUTPUT_DIR)) fs.mkdirSync(BASE_OUTPUT_DIR, { recursive: true });
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
 export const config = {
     api: {
         bodyParser: false,
         externalResolver: true,
+        responseLimit: false,
     },
-};
-
-const getRawBody = (req: any): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        let body = '';
-        req.on('data', (chunk: Buffer) => {
-            body += chunk.toString();
-        });
-        req.on('end', () => {
-            resolve(body);
-        });
-        req.on('error', (err: any) => {
-            reject(err);
-        });
-    });
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
+        const tempFilePath = path.join(TEMP_DIR, `temp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.json`);
+        
         try {
-            const rawBody = await getRawBody(req);
+            // 1. Stream the raw request body directly to a temporary file
+            const writeStream = fs.createWriteStream(tempFilePath);
+            await pipeline(req, writeStream);
+
+            // 2. Read the file to extract recordId (only need the beginning of the file usually, but we'll read small chunks)
+            // For simplicity, we'll read the whole thing now that it's on disk, but more safely than in-memory string concat
+            const content = fs.readFileSync(tempFilePath, 'utf-8');
             let body;
             try {
-                body = JSON.parse(rawBody);
+                body = JSON.parse(content);
             } catch (e) {
-                return res.status(400).send("Invalid JSON");
+                if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+                return res.status(400).send("Invalid JSON received");
             }
-            
+
             const recordId = body?.responseSet?.[0]?.recordId;
 
             if (!recordId) {
-                return res.status(400).send("No Record ID found");
+                if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+                return res.status(400).send("No Record ID found in JSON");
             }
 
-            // 1. Create the specific folder for this Record ID
+            // 3. Create the specific folder for this Record ID
             const recordFolder = path.join(BASE_OUTPUT_DIR, `Record_${recordId}`);
             if (!fs.existsSync(recordFolder)) {
                 fs.mkdirSync(recordFolder, { recursive: true });
             }
 
-            // 2. Generate a unique filename for this chunk
-            const timestamp = Date.now();
+            // 4. Move temp file to final destination
             const uniqueId = crypto.randomBytes(3).toString('hex');
-            const fileName = `${timestamp}_${uniqueId}.json`;
-            const filePath = path.join(recordFolder, fileName);
+            const fileName = `${Date.now()}_${uniqueId}.json`;
+            const finalPath = path.join(recordFolder, fileName);
+            
+            fs.renameSync(tempFilePath, finalPath);
 
-            // 3. Store the data
-            fs.writeFileSync(filePath, JSON.stringify(body, null, 4));
-
-            console.log(`[SAVED] Record ${recordId} -> ${fileName}`);
+            console.log(`[SAVED] Record ${recordId} -> ${fileName} (Size: ${content.length} bytes)`);
             return res.status(200).send(`Chunk saved in folder Record_${recordId}`);
 
         } catch (error) {
-            console.error('Storage Error:', error);
-            return res.status(500).send("Internal Server Error");
+            console.error('Streaming Storage Error:', error);
+            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+            return res.status(500).send("Internal Server Error during upload");
         }
     } else if (req.method === 'GET') {
         try {
