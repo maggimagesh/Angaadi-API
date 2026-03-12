@@ -5,6 +5,14 @@ import crypto from 'crypto';
 
 const BASE_OUTPUT_DIR = path.join(process.cwd(), 'data', 'callback_OP');
 
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '200mb',
+        },
+    },
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
         try {
