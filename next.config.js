@@ -10,6 +10,14 @@ const nextConfig = {
         source: '/callback',
         destination: '/api/callback',
       },
+      {
+        source: '/hook/:token',
+        destination: '/api/hook/:token',
+      },
+      {
+        source: '/hook/:token/:path*',
+        destination: '/api/hook/:token/:path*',
+      },
     ]
   },
 }
