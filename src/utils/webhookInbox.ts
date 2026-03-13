@@ -1,15 +1,20 @@
-import { promises as fs } from 'fs'
 import { randomUUID } from 'crypto'
-import path from 'path'
 import type { IncomingHttpHeaders } from 'http'
 import type { ParsedUrlQuery } from 'querystring'
 import type { NextApiRequest } from 'next'
 import type { WebhookCaptureListResponse, WebhookCaptureRecord, WebhookResponseInfo, WebhookStoredBody } from '@/types/webhook'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
-const WEBHOOK_DATA_DIR = path.join(process.cwd(), 'data', 'webhook_inbox')
 const JSON_RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
+}
+const MAX_WEBHOOK_RECORDS_PER_TOKEN = 100
+
+type WebhookMemoryStore = Map<string, WebhookCaptureRecord[]>
+
+declare global {
+  // eslint-disable-next-line no-var
+  var webhookCaptureStore: WebhookMemoryStore | undefined
 }
 
 function normalizeOrigin(value: string): string {
@@ -25,10 +30,6 @@ function normalizeBasePath(value: string): string {
 
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
   return withLeadingSlash.replace(/\/+$/, '')
-}
-
-function getTokenDirectory(token: string): string {
-  return path.join(WEBHOOK_DATA_DIR, token)
 }
 
 function assertWebhookToken(token: string): string {
@@ -246,12 +247,18 @@ async function readRawBody(req: NextApiRequest): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
-async function persistWebhookRecord(token: string, record: WebhookCaptureRecord): Promise<void> {
-  const tokenDirectory = getTokenDirectory(token)
-  await fs.mkdir(tokenDirectory, { recursive: true })
+function getWebhookCaptureStore(): WebhookMemoryStore {
+  if (!global.webhookCaptureStore) {
+    global.webhookCaptureStore = new Map<string, WebhookCaptureRecord[]>()
+  }
 
-  const filename = `${Date.now()}_${record.id}.json`
-  await fs.writeFile(path.join(tokenDirectory, filename), `${JSON.stringify(record, null, 2)}\n`, 'utf8')
+  return global.webhookCaptureStore
+}
+
+async function persistWebhookRecord(token: string, record: WebhookCaptureRecord): Promise<void> {
+  const store = getWebhookCaptureStore()
+  const currentRecords = store.get(token) || []
+  store.set(token, [record, ...currentRecords].slice(0, MAX_WEBHOOK_RECORDS_PER_TOKEN))
 }
 
 export function buildWebhookUrls(req: NextApiRequest, token: string): Pick<WebhookCaptureListResponse, 'captureUrl' | 'inspectUrl'> {
@@ -330,42 +337,18 @@ export async function listStoredWebhookRequests(
   token: string
 ): Promise<WebhookCaptureListResponse> {
   const safeToken = assertWebhookToken(token)
-  const tokenDirectory = getTokenDirectory(safeToken)
   const { captureUrl, inspectUrl } = buildWebhookUrls(req, safeToken)
+  const requests = [...(getWebhookCaptureStore().get(safeToken) || [])]
 
-  try {
-    const filenames = (await fs.readdir(tokenDirectory))
-      .filter((filename) => filename.endsWith('.json'))
-      .sort((left, right) => right.localeCompare(left))
-
-    const requests = await Promise.all(
-      filenames.map(async (filename) => {
-        const content = await fs.readFile(path.join(tokenDirectory, filename), 'utf8')
-        return JSON.parse(content) as WebhookCaptureRecord
-      })
-    )
-
-    return {
-      token: safeToken,
-      captureUrl,
-      inspectUrl,
-      requests,
-    }
-  } catch (error: any) {
-    if (error?.code === 'ENOENT') {
-      return {
-        token: safeToken,
-        captureUrl,
-        inspectUrl,
-        requests: [],
-      }
-    }
-
-    throw error
+  return {
+    token: safeToken,
+    captureUrl,
+    inspectUrl,
+    requests,
   }
 }
 
 export async function clearStoredWebhookRequests(token: string): Promise<void> {
   const safeToken = assertWebhookToken(token)
-  await fs.rm(getTokenDirectory(safeToken), { recursive: true, force: true })
+  getWebhookCaptureStore().delete(safeToken)
 }

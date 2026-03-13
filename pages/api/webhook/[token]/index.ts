@@ -1,8 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 import { applyPublicWebhookCors } from '@/utils/publicWebhookCors'
-import { clearStoredWebhookRequests, listStoredWebhookRequests } from '@/utils/webhookInbox'
+import { captureWebhookRequest } from '@/utils/webhookInbox'
 import { isValidWebhookToken } from '@/utils/webhookToken'
+
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+    responseLimit: false,
+  },
+}
 
 function getRouteToken(value: string | string[] | undefined): string | null {
   if (typeof value === 'string') {
@@ -33,31 +41,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (req.method === 'GET') {
-      const payload = await listStoredWebhookRequests(req, token)
-      res.status(200).json(payload)
+    const { responsePayload } = await captureWebhookRequest(req, token, [])
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+    if (req.method === 'HEAD') {
+      res.status(200).end()
       return
     }
 
-    if (req.method === 'DELETE') {
-      const currentPayload = await listStoredWebhookRequests(req, token)
-      await clearStoredWebhookRequests(token)
-
-      res.status(200).json({
-        ok: true,
-        token,
-        deleted: currentPayload.requests.length,
-      })
-      return
-    }
-
-    res.setHeader('Allow', ['GET', 'DELETE', 'OPTIONS'])
-    res.status(405).json({
-      error: `Method ${req.method} Not Allowed`,
-      hint: `Send callback payloads to /hook/${token} or /api/webhook/${token}. Use this /requests path only for GET and DELETE.`,
-    })
+    res.status(200).json(responsePayload)
   } catch (error) {
-    console.error('Webhook inspector request failed:', error)
-    res.status(500).json({ error: 'Failed to load webhook requests' })
+    console.error('Webhook capture via /api/webhook/[token] failed:', error)
+    res.status(500).json({ error: 'Failed to capture webhook request' })
   }
 }
