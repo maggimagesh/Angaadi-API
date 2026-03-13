@@ -12,6 +12,21 @@ const JSON_RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
 }
 
+function normalizeOrigin(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function normalizeBasePath(value: string): string {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return '/webhhook'
+  }
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return withLeadingSlash.replace(/\/+$/, '')
+}
+
 function getTokenDirectory(token: string): string {
   return path.join(WEBHOOK_DATA_DIR, token)
 }
@@ -199,6 +214,18 @@ function getRequestOrigin(req: NextApiRequest): string {
   return `${protocol}://${host}`
 }
 
+function getConfiguredPublicApiOrigin(req: NextApiRequest): string {
+  return normalizeOrigin(process.env.WEBHOOK_PUBLIC_API_ORIGIN || getRequestOrigin(req))
+}
+
+function getConfiguredInspectorOrigin(req: NextApiRequest): string {
+  return normalizeOrigin(process.env.WEBHOOK_INSPECTOR_ORIGIN || getRequestOrigin(req))
+}
+
+function getConfiguredInspectorBasePath(): string {
+  return normalizeBasePath(process.env.WEBHOOK_INSPECTOR_BASE_PATH || '/webhhook')
+}
+
 function getClientIpAddress(req: NextApiRequest): string | null {
   const forwardedFor = getSingleHeaderValue(req.headers['x-forwarded-for'])
 
@@ -229,11 +256,13 @@ async function persistWebhookRecord(token: string, record: WebhookCaptureRecord)
 
 export function buildWebhookUrls(req: NextApiRequest, token: string): Pick<WebhookCaptureListResponse, 'captureUrl' | 'inspectUrl'> {
   const safeToken = assertWebhookToken(token)
-  const origin = getRequestOrigin(req)
+  const apiOrigin = getConfiguredPublicApiOrigin(req)
+  const inspectorOrigin = getConfiguredInspectorOrigin(req)
+  const inspectorBasePath = getConfiguredInspectorBasePath()
 
   return {
-    captureUrl: `${origin}/hook/${safeToken}`,
-    inspectUrl: `${origin}/webhook/${safeToken}`,
+    captureUrl: `${apiOrigin}/hook/${safeToken}`,
+    inspectUrl: `${inspectorOrigin}${inspectorBasePath}/${safeToken}`,
   }
 }
 

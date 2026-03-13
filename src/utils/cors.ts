@@ -7,6 +7,8 @@ export const corsWithWhitelist = async (req: NextApiRequest, res: NextApiRespons
     'http://localhost:3001',
     'http://localhost:3300',
     'http://localhost:5173',
+    'https://angaad.online',
+    'https://www.angaad.online',
     'https://angaadi.vercel.app',
     'https://angaadi.online',
     'https://www.angaadi.online'
