@@ -53,6 +53,112 @@ export default function SwaggerUIComponent() {
           }
         }
       },
+      "/api/v1/system/toggle-route": {
+        get: {
+          summary: "List disabled API routes",
+          description: "Returns the currently disabled exact and prefix route rules. If API_TOGGLE_SECRET is configured, send it in the x-api-toggle-secret header.",
+          parameters: [
+            {
+              name: "x-api-toggle-secret",
+              in: "header",
+              required: false,
+              description: "Optional secret header required when API_TOGGLE_SECRET is configured on the server.",
+              schema: {
+                type: "string"
+              }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Current route toggle state",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      exactRoutes: {
+                        type: "array",
+                        items: { type: "string" },
+                        example: ["/api/v1/products"]
+                      },
+                      prefixRoutes: {
+                        type: "array",
+                        items: { type: "string" },
+                        example: ["/api/v1/users"]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            401: {
+              description: "Unauthorized"
+            }
+          }
+        },
+        post: {
+          summary: "Toggle an API route up or down",
+          description: "Call this once to disable a route and call it again with the same route and scope to re-enable it.",
+          parameters: [
+            {
+              name: "x-api-toggle-secret",
+              in: "header",
+              required: false,
+              description: "Optional secret header required when API_TOGGLE_SECRET is configured on the server.",
+              schema: {
+                type: "string"
+              }
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["route"],
+                  properties: {
+                    route: {
+                      type: "string",
+                      example: "/api/v1/products"
+                    },
+                    scope: {
+                      type: "string",
+                      enum: ["exact", "prefix"],
+                      default: "exact",
+                      example: "exact"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Route toggled",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      route: { type: "string", example: "/api/v1/products" },
+                      scope: { type: "string", example: "exact" },
+                      disabled: { type: "boolean", example: true },
+                      status: { type: "string", example: "down" }
+                    }
+                  }
+                }
+              }
+            },
+            400: {
+              description: "Invalid route or scope"
+            },
+            401: {
+              description: "Unauthorized"
+            }
+          }
+        }
+      },
       "/api/v1/users/createUser": {
         post: {
           summary: "Create user",

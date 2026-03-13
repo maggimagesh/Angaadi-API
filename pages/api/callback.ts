@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { pipeline } from 'stream/promises';
+import { enforceRouteAvailability } from '@/utils/apiAvailability'
 
 const BASE_OUTPUT_DIR = path.join(process.cwd(), 'data', 'callback_OP');
 const TEMP_DIR = path.join(process.cwd(), 'data', 'temp');
@@ -20,6 +21,9 @@ export const config = {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    const routeAvailable = await enforceRouteAvailability(req, res)
+    if (!routeAvailable) return
+
     if (req.method === 'POST') {
         const tempFilePath = path.join(TEMP_DIR, `temp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.json`);
         

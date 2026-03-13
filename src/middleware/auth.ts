@@ -1,6 +1,7 @@
 import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next'
 import { authenticateRequest } from '@/lib/auth'
 import { corsWithWhitelist } from '@/utils/cors'
+import { enforceRouteAvailability } from '@/utils/apiAvailability'
 
 export async function checkCORS(req: NextApiRequest, res: NextApiResponse) {
   const corsOk = await corsWithWhitelist(req, res);
@@ -12,6 +13,9 @@ export function withAuth(handler: NextApiHandler) {
     // Handle CORS first
     const corsOk = await checkCORS(req, res);
     if (!corsOk) return;
+
+    const routeAvailable = await enforceRouteAvailability(req, res)
+    if (!routeAvailable) return;
     
     const user = await authenticateRequest(req)
     

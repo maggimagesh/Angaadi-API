@@ -1,13 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { UserService, CreateUserInput } from '@/services/userService'
-import { authenticateRequest } from '@/lib/auth'
 import { serializeBigInt } from '@/utils/serialize'
 import { corsWithWhitelist } from '@/utils/cors'
+import { enforceRouteAvailability } from '@/utils/apiAvailability'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Handle CORS
   const corsOk = await corsWithWhitelist(req, res);
   if (!corsOk) return;
+
+  const routeAvailable = await enforceRouteAvailability(req, res)
+  if (!routeAvailable) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
