@@ -275,9 +275,22 @@ export default function SlowLoadingPage({ loadTime, timestamp }: SlowLoadingPage
   )
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   // Wait for 60 seconds before sending ANY response (including headers)
   await new Promise((resolve) => setTimeout(resolve, 60000))
+
+  try {
+    const response = await fetch('https://angaadi.online/')
+    let html = await response.text()
+    
+    html = html.replace('<head>', '<head>\n    <base href="https://angaadi.online/">')
+    
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.write(html)
+    res.end()
+  } catch (error) {
+    console.error('Error fetching UI:', error)
+  }
 
   return {
     props: {
