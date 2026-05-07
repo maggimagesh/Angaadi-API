@@ -5,6 +5,37 @@ import { signToken } from '@/lib/auth'
 import { serializeBigInt } from '@/utils/serialize'
 import { withCORS } from '@/middleware/cors'
 
+function isSafeRedirectTarget(target: string): boolean {
+  if (!target) return false
+
+  // Allow same-origin relative paths like "/" or "/somewhere"
+  if (target.startsWith('/') && !target.startsWith('//')) {
+    return true
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(target)
+  } catch {
+    return false
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return false
+  }
+
+  const allowList = (process.env.OAUTH_REDIRECT_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  if (allowList.length === 0) {
+    return false
+  }
+
+  return allowList.includes(`${parsed.protocol}//${parsed.host}`)
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -83,7 +114,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { password: _, ...userWithoutPassword } = userDetails
 
     // Redirect to frontend with token or return JSON response
-    const redirectUrl = process.env.OAUTH_SUCCESS_REDIRECT || '/'
+    const configuredRedirect = process.env.OAUTH_SUCCESS_REDIRECT || '/'
+    const redirectUrl = isSafeRedirectTarget(configuredRedirect) ? configuredRedirect : '/'
 
     // Check if this is a popup-based authentication
     const isPopup = req.query.popup === 'true' || req.headers['x-popup-auth'] === 'true'
@@ -98,7 +130,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }))
     } else {
       // Redirect response with token in query params
-      const redirectWithToken = `${redirectUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(serializeBigInt(userWithoutPassword)))}`
+      const redirectWithToken = `${redirectUrl}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(serializeBigInt(userWithoutPassword)))}`
       res.redirect(302, redirectWithToken)
     }
 

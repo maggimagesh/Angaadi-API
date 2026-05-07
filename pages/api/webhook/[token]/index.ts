@@ -52,6 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json(responsePayload)
   } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode === 413) {
+      res.status(413).json({ error: 'Webhook body exceeds maximum allowed size' })
+      return
+    }
     console.error('Webhook capture via /api/webhook/[token] failed:', error)
     res.status(500).json({ error: 'Failed to capture webhook request' })
   }

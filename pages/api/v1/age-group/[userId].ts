@@ -10,10 +10,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Validation - Check if userId is provided
     if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request',
-        details: 'userId parameter is required and must be a valid number' 
+        details: 'userId parameter is required and must be a valid number'
       })
+    }
+
+    const authUserId = String((req as { user?: { sub?: string } }).user?.sub || '')
+    if (!authUserId || authUserId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     // Convert userId to BigInt
@@ -21,15 +26,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       userIdBigInt = BigInt(userId)
       if (userIdBigInt <= 0) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Invalid userId',
-          details: 'userId must be a positive number' 
+          details: 'userId must be a positive number'
         })
       }
     } catch (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid userId format',
-        details: 'userId must be a valid number' 
+        details: 'userId must be a valid number'
       })
     }
 

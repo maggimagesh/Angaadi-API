@@ -9,6 +9,7 @@ const JSON_RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
 }
 const MAX_WEBHOOK_RECORDS_PER_TOKEN = 100
+const MAX_WEBHOOK_BODY_BYTES = 5 * 1024 * 1024
 
 type WebhookMemoryStore = Map<string, WebhookCaptureRecord[]>
 
@@ -81,7 +82,15 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
       return cookies
     }
 
-    cookies[rawKey] = decodeURIComponent(rawValue.join('=') || '')
+    const rawValueJoined = rawValue.join('=') || ''
+    let value: string
+    try {
+      value = decodeURIComponent(rawValueJoined)
+    } catch {
+      value = rawValueJoined
+    }
+
+    cookies[rawKey] = value
     return cookies
   }, {})
 }
@@ -239,9 +248,19 @@ function getClientIpAddress(req: NextApiRequest): string | null {
 
 async function readRawBody(req: NextApiRequest): Promise<Buffer> {
   const chunks: Buffer[] = []
+  let totalBytes = 0
 
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    totalBytes += buffer.length
+
+    if (totalBytes > MAX_WEBHOOK_BODY_BYTES) {
+      throw Object.assign(new Error('Webhook body exceeds maximum allowed size'), {
+        statusCode: 413,
+      })
+    }
+
+    chunks.push(buffer)
   }
 
   return Buffer.concat(chunks)

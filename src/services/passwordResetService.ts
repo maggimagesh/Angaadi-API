@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { randomBytes, randomInt } from 'crypto'
 import prisma from '@/lib/prisma'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -31,13 +32,13 @@ export interface OTPRecord {
 
 export class PasswordResetService {
   private generateOTP(): string {
-    // Generate a 6-digit OTP
-    return Math.floor(100000 + Math.random() * 900000).toString()
+    // Generate a 6-digit OTP using a cryptographically strong RNG
+    return randomInt(100000, 1000000).toString()
   }
 
   private generateResetToken(): string {
-    // Generate a secure reset token
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    // 32 random bytes = 256 bits of entropy, encoded as URL-safe hex
+    return randomBytes(32).toString('hex')
   }
 
   async sendPasswordResetEmail(emailId: string, otp: string): Promise<void> {

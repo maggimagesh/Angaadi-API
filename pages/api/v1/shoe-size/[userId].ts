@@ -27,6 +27,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       })
     }
 
+    const authUserId = String((req as { user?: { sub?: string } }).user?.sub || '')
+    if (!authUserId || authUserId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
     let userIdBigInt: bigint
 
     try {

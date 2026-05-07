@@ -50,8 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 return res.status(400).send("No Record ID found in JSON");
             }
 
+            const recordIdString = String(recordId);
+            if (!/^[A-Za-z0-9_-]{1,64}$/.test(recordIdString)) {
+                if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+                return res.status(400).send("Invalid Record ID format");
+            }
+
             // 3. Create the specific folder for this Record ID
-            const recordFolder = path.join(BASE_OUTPUT_DIR, `Record_${recordId}`);
+            const recordFolder = path.join(BASE_OUTPUT_DIR, `Record_${recordIdString}`);
             if (!fs.existsSync(recordFolder)) {
                 fs.mkdirSync(recordFolder, { recursive: true });
             }

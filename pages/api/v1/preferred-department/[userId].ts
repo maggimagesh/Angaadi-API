@@ -10,6 +10,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'User ID is required' })
   }
 
+  const authUserId = String((req as { user?: { sub?: string } }).user?.sub || '')
+  if (!authUserId || authUserId !== userId) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+
   try {
     const preferredDepartmentService = new PreferredDepartmentService()
     

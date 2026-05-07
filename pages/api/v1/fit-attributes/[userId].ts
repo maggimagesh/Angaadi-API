@@ -9,17 +9,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // Validate userId
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Invalid userId',
       details: 'userId is required and must be a string'
     })
   }
 
   if (isNaN(Number(userId)) || Number(userId) <= 0) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Invalid userId',
       details: 'userId must be a positive number'
     })
+  }
+
+  const authUserId = String((req as { user?: { sub?: string } }).user?.sub || '')
+  if (!authUserId || authUserId !== userId) {
+    return res.status(403).json({ error: 'Forbidden' })
   }
 
   try {
