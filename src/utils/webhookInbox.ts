@@ -10,7 +10,6 @@ import { isValidWebhookToken } from '@/utils/webhookToken'
 const JSON_RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
 }
-const MAX_WEBHOOK_RECORDS_PER_TOKEN = 100
 const ONE_GB = 1024 * 1024 * 1024
 
 function readPositiveIntEnv(name: string, fallback: number): number {
@@ -22,6 +21,7 @@ function readPositiveIntEnv(name: string, fallback: number): number {
 
 const MAX_WEBHOOK_BODY_BYTES = readPositiveIntEnv('WEBHOOK_MAX_BODY_BYTES', ONE_GB)
 const INLINE_BODY_THRESHOLD = readPositiveIntEnv('WEBHOOK_INLINE_BODY_BYTES', 256 * 1024)
+const MAX_WEBHOOK_RECORDS_PER_TOKEN = readPositiveIntEnv('WEBHOOK_MAX_RECORDS_PER_TOKEN', 100)
 const BODY_PREVIEW_BYTES = 4096
 const PREVIEW_TEXT_CHARS = 2000
 

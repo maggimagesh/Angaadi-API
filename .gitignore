@@ -67,3 +67,5 @@ prisma/*.db-journal
 *.tgz
 
 .env.local
+
+DEPLOY-WEBHOOKS.md

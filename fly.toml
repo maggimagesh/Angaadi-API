@@ -1,0 +1,47 @@
+# Fly.io deployment config for the webhook capture host.
+# Bound to https://webhooks.angaadi.online via `fly certs add` + a CNAME
+# record pointing at <app>.fly.dev.
+#
+# Rename `app` below to whatever you used with `fly launch`.
+
+app = "angaadi-webhooks"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  WEBHOOK_PUBLIC_API_ORIGIN = "https://webhooks.angaadi.online"
+  WEBHOOK_INSPECTOR_ORIGIN = "https://webhooks.angaadi.online"
+  WEBHOOK_INSPECTOR_BASE_PATH = "/valid-webhooks"
+  WEBHOOK_BODY_DIR = "/data/webhook_inbox"
+  # 1 GiB per request body (matches the user-stated upper bound).
+  WEBHOOK_MAX_BODY_BYTES = "1073741824"
+  # Bodies above 256 KiB spill to disk so a 1 GiB upload never sits in memory.
+  WEBHOOK_INLINE_BODY_BYTES = "262144"
+  # Retain at most 5 callbacks per token. At 1 GiB each that bounds disk use
+  # per token to ~5 GiB. Raise it only if you also raise the volume size.
+  WEBHOOK_MAX_RECORDS_PER_TOKEN = "5"
+
+# Persistent volume for disk-spilled webhook bodies. Survives machine restarts
+# and is what stops a 1 GiB upload from blowing through /tmp.
+[mounts]
+  source = "webhook_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Keep at least one machine warm so multi-minute uploads don't hit a
+  # cold start mid-stream.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024

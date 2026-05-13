@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+*.log
+data/
+.vercel
+.vscode
+.idea
+README.md
+DEPLOY-WEBHOOKS.md
+Dockerfile
+.dockerignore
+fly.toml
