@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto'
+import { createWriteStream, promises as fsp, type WriteStream } from 'fs'
+import path from 'path'
 import type { IncomingHttpHeaders } from 'http'
 import type { ParsedUrlQuery } from 'querystring'
 import type { NextApiRequest } from 'next'
@@ -9,9 +11,25 @@ const JSON_RESPONSE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
 }
 const MAX_WEBHOOK_RECORDS_PER_TOKEN = 100
-const MAX_WEBHOOK_BODY_BYTES = 5 * 1024 * 1024
+const ONE_GB = 1024 * 1024 * 1024
 
-type WebhookMemoryStore = Map<string, WebhookCaptureRecord[]>
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
+}
+
+const MAX_WEBHOOK_BODY_BYTES = readPositiveIntEnv('WEBHOOK_MAX_BODY_BYTES', ONE_GB)
+const INLINE_BODY_THRESHOLD = readPositiveIntEnv('WEBHOOK_INLINE_BODY_BYTES', 256 * 1024)
+const BODY_PREVIEW_BYTES = 4096
+const PREVIEW_TEXT_CHARS = 2000
+
+interface InternalRecord extends WebhookCaptureRecord {
+  bodyFilePath?: string
+}
+
+type WebhookMemoryStore = Map<string, InternalRecord[]>
 
 declare global {
   // eslint-disable-next-line no-var
@@ -120,7 +138,7 @@ function looksMostlyText(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 1024))
   const decoded = sample.toString('utf8')
 
-  if (decoded.includes('\uFFFD')) {
+  if (decoded.includes('�')) {
     return false
   }
 
@@ -143,19 +161,19 @@ function looksMostlyText(buffer: Buffer): boolean {
   return decoded.length === 0 || suspiciousCharacters / decoded.length < 0.05
 }
 
-function buildBodyPreview(body: WebhookStoredBody): string | null {
+function buildInlinePreview(body: WebhookStoredBody): string | null {
   if (body.format === 'binary') {
     return `[binary payload, ${body.sizeBytes} bytes]`
   }
 
   if (body.format === 'json') {
-    return JSON.stringify(body.json, null, 2).slice(0, 2000)
+    return JSON.stringify(body.json, null, 2).slice(0, PREVIEW_TEXT_CHARS)
   }
 
-  return body.text ? body.text.slice(0, 2000) : null
+  return body.text ? body.text.slice(0, PREVIEW_TEXT_CHARS) : null
 }
 
-function buildStoredBody(buffer: Buffer, contentTypeHeader: string | null): WebhookStoredBody {
+function buildInlineStoredBody(buffer: Buffer, contentTypeHeader: string | null): WebhookStoredBody {
   const contentType = contentTypeHeader?.split(';')[0]?.trim().toLowerCase() || null
 
   if (buffer.length === 0) {
@@ -168,6 +186,8 @@ function buildStoredBody(buffer: Buffer, contentTypeHeader: string | null): Webh
       json: null,
       base64: null,
       preview: null,
+      truncated: false,
+      downloadUrl: null,
     }
   }
 
@@ -194,9 +214,11 @@ function buildStoredBody(buffer: Buffer, contentTypeHeader: string | null): Webh
       json: parsedJson,
       base64: null,
       preview: null,
+      truncated: false,
+      downloadUrl: null,
     }
 
-    storedBody.preview = buildBodyPreview(storedBody)
+    storedBody.preview = buildInlinePreview(storedBody)
     return storedBody
   }
 
@@ -209,10 +231,74 @@ function buildStoredBody(buffer: Buffer, contentTypeHeader: string | null): Webh
     json: null,
     base64: buffer.toString('base64'),
     preview: null,
+    truncated: false,
+    downloadUrl: null,
   }
 
-  storedBody.preview = buildBodyPreview(storedBody)
+  storedBody.preview = buildInlinePreview(storedBody)
   return storedBody
+}
+
+function buildDiskStoredBody(args: {
+  sizeBytes: number
+  headSample: Buffer
+  contentTypeHeader: string | null
+  downloadUrl: string
+}): WebhookStoredBody {
+  const { sizeBytes, headSample, contentTypeHeader, downloadUrl } = args
+  const contentType = contentTypeHeader?.split(';')[0]?.trim().toLowerCase() || null
+  const probablyText =
+    isTextualContentType(contentType) || (!contentType && looksMostlyText(headSample))
+
+  if (probablyText) {
+    const sample = headSample.toString('utf8')
+    const trimmed = sample.length > PREVIEW_TEXT_CHARS ? sample.slice(0, PREVIEW_TEXT_CHARS) : sample
+    const preview = `${trimmed}\n\n… body truncated for inline view — ${sizeBytes.toLocaleString()} bytes total. Use the Download button to fetch the full payload.`
+
+    return {
+      format: 'text',
+      encoding: 'utf8',
+      sizeBytes,
+      contentType,
+      text: null,
+      json: null,
+      base64: null,
+      preview,
+      truncated: true,
+      downloadUrl,
+    }
+  }
+
+  return {
+    format: 'binary',
+    encoding: 'base64',
+    sizeBytes,
+    contentType,
+    text: null,
+    json: null,
+    base64: null,
+    preview: `[binary payload, ${sizeBytes.toLocaleString()} bytes — use the Download button to fetch]`,
+    truncated: true,
+    downloadUrl,
+  }
+}
+
+function slimBodyForList(body: WebhookStoredBody): WebhookStoredBody {
+  if (body.truncated) {
+    return body
+  }
+
+  if (body.sizeBytes <= INLINE_BODY_THRESHOLD) {
+    return body
+  }
+
+  return {
+    ...body,
+    text: null,
+    json: null,
+    base64: null,
+    truncated: true,
+  }
 }
 
 function getRequestOrigin(req: NextApiRequest): string {
@@ -246,38 +332,161 @@ function getClientIpAddress(req: NextApiRequest): string | null {
   return req.socket.remoteAddress || null
 }
 
-async function readRawBody(req: NextApiRequest): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  let totalBytes = 0
+function getStorageRoot(): string {
+  return process.env.WEBHOOK_BODY_DIR || path.join(process.cwd(), 'data', 'webhook_inbox')
+}
 
-  for await (const chunk of req) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    totalBytes += buffer.length
+async function ensureTokenDir(token: string): Promise<string> {
+  const dir = path.join(getStorageRoot(), token)
+  await fsp.mkdir(dir, { recursive: true })
+  return dir
+}
 
-    if (totalBytes > MAX_WEBHOOK_BODY_BYTES) {
-      throw Object.assign(new Error('Webhook body exceeds maximum allowed size'), {
-        statusCode: 413,
-      })
+function buildBodyDownloadPath(token: string, requestId: string): string {
+  return `/api/webhook/${encodeURIComponent(token)}/${encodeURIComponent(requestId)}/body`
+}
+
+type ReadBodyResult =
+  | { kind: 'inline'; buffer: Buffer; sizeBytes: number }
+  | { kind: 'disk'; filePath: string; sizeBytes: number; headSample: Buffer }
+
+async function writeChunk(stream: WriteStream, chunk: Buffer): Promise<void> {
+  if (stream.write(chunk)) {
+    return
+  }
+  await new Promise<void>((resolve, reject) => {
+    const onDrain = () => {
+      stream.off('error', onError)
+      resolve()
     }
+    const onError = (err: Error) => {
+      stream.off('drain', onDrain)
+      reject(err)
+    }
+    stream.once('drain', onDrain)
+    stream.once('error', onError)
+  })
+}
 
-    chunks.push(buffer)
+async function endStream(stream: WriteStream): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    stream.once('error', reject)
+    stream.end(() => resolve())
+  })
+}
+
+async function readAndStoreBody(
+  req: NextApiRequest,
+  token: string,
+  requestId: string
+): Promise<ReadBodyResult> {
+  const inlineChunks: Buffer[] = []
+  let totalBytes = 0
+  let spilling = false
+  const streamRef: { current: WriteStream | null } = { current: null }
+  let filePath = ''
+  let headSample: Buffer = Buffer.alloc(0)
+
+  const captureHead = (chunk: Buffer) => {
+    if (headSample.length >= BODY_PREVIEW_BYTES) {
+      return
+    }
+    const needed = BODY_PREVIEW_BYTES - headSample.length
+    headSample = Buffer.concat([headSample, chunk.subarray(0, Math.min(needed, chunk.length))])
   }
 
-  return Buffer.concat(chunks)
+  const spillToDisk = async () => {
+    const dir = await ensureTokenDir(token)
+    filePath = path.join(dir, `${requestId}.bin`)
+    const stream = createWriteStream(filePath)
+    streamRef.current = stream
+    headSample = Buffer.concat(inlineChunks).subarray(0, BODY_PREVIEW_BYTES)
+    for (const buffered of inlineChunks) {
+      await writeChunk(stream, buffered)
+    }
+    inlineChunks.length = 0
+    spilling = true
+  }
+
+  try {
+    for await (const chunk of req) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      totalBytes += buffer.length
+
+      if (totalBytes > MAX_WEBHOOK_BODY_BYTES) {
+        throw Object.assign(new Error('Webhook body exceeds maximum allowed size'), {
+          statusCode: 413,
+        })
+      }
+
+      if (!spilling) {
+        inlineChunks.push(buffer)
+        if (totalBytes > INLINE_BODY_THRESHOLD) {
+          await spillToDisk()
+        }
+      } else {
+        await writeChunk(streamRef.current!, buffer)
+        captureHead(buffer)
+      }
+    }
+
+    if (streamRef.current) {
+      await endStream(streamRef.current)
+      return { kind: 'disk', filePath, sizeBytes: totalBytes, headSample }
+    }
+
+    return { kind: 'inline', buffer: Buffer.concat(inlineChunks), sizeBytes: totalBytes }
+  } catch (err) {
+    if (streamRef.current) {
+      try {
+        streamRef.current.destroy()
+      } catch {
+        /* ignore */
+      }
+      try {
+        await fsp.unlink(filePath)
+      } catch {
+        /* ignore */
+      }
+    }
+    throw err
+  }
 }
 
 function getWebhookCaptureStore(): WebhookMemoryStore {
   if (!global.webhookCaptureStore) {
-    global.webhookCaptureStore = new Map<string, WebhookCaptureRecord[]>()
+    global.webhookCaptureStore = new Map<string, InternalRecord[]>()
   }
 
   return global.webhookCaptureStore
 }
 
-async function persistWebhookRecord(token: string, record: WebhookCaptureRecord): Promise<void> {
+async function persistWebhookRecord(token: string, record: InternalRecord): Promise<void> {
   const store = getWebhookCaptureStore()
   const currentRecords = store.get(token) || []
-  store.set(token, [record, ...currentRecords].slice(0, MAX_WEBHOOK_RECORDS_PER_TOKEN))
+  const nextRecords = [record, ...currentRecords]
+  const kept = nextRecords.slice(0, MAX_WEBHOOK_RECORDS_PER_TOKEN)
+  const evicted = nextRecords.slice(MAX_WEBHOOK_RECORDS_PER_TOKEN)
+  store.set(token, kept)
+
+  for (const old of evicted) {
+    if (old.bodyFilePath) {
+      try {
+        await fsp.unlink(old.bodyFilePath)
+      } catch {
+        /* ignore missing files */
+      }
+    }
+  }
+}
+
+function publicRecord(record: InternalRecord, slimBody = false): WebhookCaptureRecord {
+  const { bodyFilePath: _unused, ...rest } = record
+  void _unused
+  return {
+    ...rest,
+    body: slimBody ? slimBodyForList(rest.body) : rest.body,
+  }
 }
 
 export function buildWebhookUrls(req: NextApiRequest, token: string): Pick<WebhookCaptureListResponse, 'captureUrl' | 'inspectUrl'> {
@@ -303,7 +512,25 @@ export async function captureWebhookRequest(
   const origin = getRequestOrigin(req)
   const { captureUrl, inspectUrl } = buildWebhookUrls(req, safeToken)
   const method = req.method?.toUpperCase() || 'GET'
-  const rawBody = await readRawBody(req)
+  const contentTypeHeader = getSingleHeaderValue(req.headers['content-type'])
+
+  const bodyResult = await readAndStoreBody(req, safeToken, requestId)
+
+  let storedBody: WebhookStoredBody
+  let bodyFilePath: string | undefined
+
+  if (bodyResult.kind === 'inline') {
+    storedBody = buildInlineStoredBody(bodyResult.buffer, contentTypeHeader)
+  } else {
+    bodyFilePath = bodyResult.filePath
+    storedBody = buildDiskStoredBody({
+      sizeBytes: bodyResult.sizeBytes,
+      headSample: bodyResult.headSample,
+      contentTypeHeader,
+      downloadUrl: buildBodyDownloadPath(safeToken, requestId),
+    })
+  }
+
   const { token: _token, path: _path, ...queryWithoutRouteParams } = req.query
   const pathValue = pathSegments.length > 0 ? `/${pathSegments.join('/')}` : '/'
   const requestUrl = `${origin}${req.url || `/hook/${safeToken}`}`
@@ -319,6 +546,8 @@ export async function captureWebhookRequest(
     requestUrl,
     captureUrl,
     inspectUrl,
+    sizeBytes: storedBody.sizeBytes,
+    truncated: Boolean(storedBody.truncated),
   }
 
   const response: WebhookResponseInfo = {
@@ -328,7 +557,7 @@ export async function captureWebhookRequest(
     text: JSON.stringify(responsePayload, null, 2),
   }
 
-  const record: WebhookCaptureRecord = {
+  const record: InternalRecord = {
     id: requestId,
     token: safeToken,
     receivedAt,
@@ -339,14 +568,15 @@ export async function captureWebhookRequest(
     headers: normalizeHeaders(req.headers),
     cookies: parseCookies(getSingleHeaderValue(req.headers.cookie)),
     ip: getClientIpAddress(req),
-    body: buildStoredBody(rawBody, getSingleHeaderValue(req.headers['content-type'])),
+    body: storedBody,
     response,
+    bodyFilePath,
   }
 
   await persistWebhookRecord(safeToken, record)
 
   return {
-    record,
+    record: publicRecord(record),
     responsePayload,
   }
 }
@@ -357,7 +587,8 @@ export async function listStoredWebhookRequests(
 ): Promise<WebhookCaptureListResponse> {
   const safeToken = assertWebhookToken(token)
   const { captureUrl, inspectUrl } = buildWebhookUrls(req, safeToken)
-  const requests = [...(getWebhookCaptureStore().get(safeToken) || [])]
+  const internalRecords = getWebhookCaptureStore().get(safeToken) || []
+  const requests = internalRecords.map((record) => publicRecord(record, true))
 
   return {
     token: safeToken,
@@ -367,7 +598,41 @@ export async function listStoredWebhookRequests(
   }
 }
 
+export async function getStoredWebhookRequest(
+  token: string,
+  requestId: string
+): Promise<{ record: WebhookCaptureRecord; bodyFilePath: string | null } | null> {
+  const safeToken = assertWebhookToken(token)
+  const records = getWebhookCaptureStore().get(safeToken) || []
+  const record = records.find((r) => r.id === requestId)
+  if (!record) {
+    return null
+  }
+  return {
+    record: publicRecord(record),
+    bodyFilePath: record.bodyFilePath || null,
+  }
+}
+
 export async function clearStoredWebhookRequests(token: string): Promise<void> {
   const safeToken = assertWebhookToken(token)
-  getWebhookCaptureStore().delete(safeToken)
+  const store = getWebhookCaptureStore()
+  const records = store.get(safeToken) || []
+  store.delete(safeToken)
+
+  for (const record of records) {
+    if (record.bodyFilePath) {
+      try {
+        await fsp.unlink(record.bodyFilePath)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  try {
+    await fsp.rm(path.join(getStorageRoot(), safeToken), { recursive: true, force: true })
+  } catch {
+    /* ignore */
+  }
 }

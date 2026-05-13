@@ -10,6 +10,8 @@ export interface WebhookStoredBody {
   json: unknown | null
   base64: string | null
   preview: string | null
+  truncated?: boolean
+  downloadUrl?: string | null
 }
 
 export interface WebhookResponseInfo {
