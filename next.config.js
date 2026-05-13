@@ -14,6 +14,14 @@ const nextConfig = {
         source: '/hook/:token/:path*',
         destination: '/api/hook/:token/:path*',
       },
+      {
+        source: '/valid-webhooks/:token',
+        destination: '/api/hook/:token',
+      },
+      {
+        source: '/valid-webhooks/:token/:path*',
+        destination: '/api/hook/:token/:path*',
+      },
     ]
   },
 }
