@@ -44,7 +44,7 @@ function normalizeBasePath(value: string): string {
   const trimmed = value.trim()
 
   if (!trimmed) {
-    return '/webhhook'
+    return '/valid-webhooks'
   }
 
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
@@ -319,7 +319,7 @@ function getConfiguredInspectorOrigin(req: NextApiRequest): string {
 }
 
 function getConfiguredInspectorBasePath(): string {
-  return normalizeBasePath(process.env.WEBHOOK_INSPECTOR_BASE_PATH || '/webhhook')
+  return normalizeBasePath(process.env.WEBHOOK_INSPECTOR_BASE_PATH || '/valid-webhooks')
 }
 
 function getClientIpAddress(req: NextApiRequest): string | null {
@@ -496,7 +496,7 @@ export function buildWebhookUrls(req: NextApiRequest, token: string): Pick<Webho
   const inspectorBasePath = getConfiguredInspectorBasePath()
 
   return {
-    captureUrl: `${apiOrigin}/hook/${safeToken}`,
+    captureUrl: `${apiOrigin}${inspectorBasePath}/${safeToken}`,
     inspectUrl: `${inspectorOrigin}${inspectorBasePath}/${safeToken}`,
   }
 }
