@@ -3,6 +3,11 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        // Clean URL for the crawler 400-Bad-Request fixture page.
+        source: '/bad-request',
+        destination: '/bad-request/index.html',
+      },
+      {
         source: '/callback',
         destination: '/api/callback',
       },
