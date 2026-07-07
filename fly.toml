@@ -21,9 +21,9 @@ primary_region = "bom"
   WEBHOOK_MAX_BODY_BYTES = "1073741824"
   # Bodies above 256 KiB spill to disk so a 1 GiB upload never sits in memory.
   WEBHOOK_INLINE_BODY_BYTES = "262144"
-  # Retain at most 5 callbacks per token. At 1 GiB each that bounds disk use
+  # Retain at most 500 callbacks per token. At 1 GiB each that bounds disk use
   # per token to ~5 GiB. Raise it only if you also raise the volume size.
-  WEBHOOK_MAX_RECORDS_PER_TOKEN = "5"
+  WEBHOOK_MAX_RECORDS_PER_TOKEN = "500"
 
 # Persistent volume for disk-spilled webhook bodies. Survives machine restarts
 # and is what stops a 1 GiB upload from blowing through /tmp.
