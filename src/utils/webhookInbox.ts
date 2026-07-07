@@ -350,6 +350,8 @@ const CLIENT_IP_HEADER_CANDIDATES = [
   'x-azure-clientip',
 ] as const
 
+const DEFAULT_CALLBACK_SENDER_IP_HEADER = 'fly-client-ip'
+
 const PROXY_HEADER_NAMES = [
   'x-forwarded-for',
   'x-forwarded-proto',
@@ -533,6 +535,38 @@ function resolveClientIp(req: NextApiRequest): { ip: string | null; ipSource: st
   return { ip: null, ipSource: null }
 }
 
+function resolveFlyClientIp(req: NextApiRequest): { ip: string | null; ipSource: string | null } {
+  const ip = normalizeIp(getSingleHeaderValue(req.headers['fly-client-ip'])?.split(',')[0])
+  return {
+    ip,
+    ipSource: ip ? 'fly-client-ip header' : null,
+  }
+}
+
+function getConfiguredCallbackSenderIpHeaders(): string[] {
+  const configured = process.env.WEBHOOK_CALLBACK_SENDER_IP_HEADER || DEFAULT_CALLBACK_SENDER_IP_HEADER
+  const headerNames = configured
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+
+  return headerNames.length > 0 ? headerNames : [DEFAULT_CALLBACK_SENDER_IP_HEADER]
+}
+
+function resolveCallbackSenderIp(
+  req: NextApiRequest,
+  fallback: { ip: string | null; ipSource: string | null }
+): { ip: string | null; ipSource: string | null } {
+  for (const headerName of getConfiguredCallbackSenderIpHeaders()) {
+    const ip = normalizeIp(getSingleHeaderValue(req.headers[headerName])?.split(',')[0])
+    if (ip) {
+      return { ip, ipSource: `${headerName} header` }
+    }
+  }
+
+  return fallback
+}
+
 function parseContentLength(value: string | null): number | null {
   if (!value) {
     return null
@@ -544,6 +578,8 @@ function parseContentLength(value: string | null): number | null {
 function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
   const header = (name: string) => getSingleHeaderValue(req.headers[name])
   const { ip, ipSource } = resolveClientIp(req)
+  const callbackSender = resolveCallbackSenderIp(req, { ip, ipSource })
+  const flyClient = resolveFlyClientIp(req)
   const remoteAddress = normalizeIp(req.socket.remoteAddress)
 
   const forwardedForChain = (header('x-forwarded-for') || '')
@@ -555,6 +591,9 @@ function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
   if (remoteAddress && !ipChain.includes(remoteAddress)) {
     ipChain.push(remoteAddress)
   }
+
+  const flyForwardedIp =
+    [...forwardedForChain].reverse().find((entry) => entry !== callbackSender.ip) || null
 
   const proxyHeaders: Record<string, string> = {}
   for (const name of PROXY_HEADER_NAMES) {
@@ -585,6 +624,11 @@ function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
   return {
     ip,
     ipSource,
+    callbackSenderIp: callbackSender.ip,
+    callbackSenderIpSource: callbackSender.ipSource,
+    flyClientIp: flyClient.ip,
+    flyForwardedIp,
+    flyProxyIp: remoteAddress,
     ipChain,
     remoteAddress,
     remotePort: req.socket.remotePort ?? null,
@@ -859,6 +903,11 @@ export async function captureWebhookRequest(
     captureUrl,
     inspectUrl,
     senderIp: sender.ip,
+    callbackSenderIp: sender.callbackSenderIp,
+    callbackSenderIpSource: sender.callbackSenderIpSource,
+    flyClientIp: sender.flyClientIp,
+    flyForwardedIp: sender.flyForwardedIp,
+    flyProxyIp: sender.flyProxyIp,
     sizeBytes: storedBody.sizeBytes,
     truncated: Boolean(storedBody.truncated),
   }
@@ -881,6 +930,7 @@ export async function captureWebhookRequest(
     headers: normalizeHeaders(req.headers),
     cookies: parseCookies(getSingleHeaderValue(req.headers.cookie)),
     ip: sender.ip,
+    callbackSenderIp: sender.callbackSenderIp,
     sender,
     body: storedBody,
     response,

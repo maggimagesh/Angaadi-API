@@ -17,6 +17,7 @@ primary_region = "bom"
   WEBHOOK_INSPECTOR_ORIGIN = "https://webhooks.angaadi.online"
   WEBHOOK_INSPECTOR_BASE_PATH = "/valid-webhooks"
   WEBHOOK_BODY_DIR = "/data/webhook_inbox"
+  WEBHOOK_CALLBACK_SENDER_IP_HEADER = "fly-client-ip"
   # 1 GiB per request body (matches the user-stated upper bound).
   WEBHOOK_MAX_BODY_BYTES = "1073741824"
   # Bodies above 256 KiB spill to disk so a 1 GiB upload never sits in memory.

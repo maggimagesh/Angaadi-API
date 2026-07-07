@@ -42,6 +42,11 @@ export interface WebhookForwardedInfo {
 export interface WebhookSenderInfo {
   ip: string | null
   ipSource: string | null
+  callbackSenderIp: string | null
+  callbackSenderIpSource: string | null
+  flyClientIp: string | null
+  flyForwardedIp: string | null
+  flyProxyIp: string | null
   ipChain: string[]
   remoteAddress: string | null
   remotePort: number | null
@@ -80,6 +85,7 @@ export interface WebhookCaptureRecord {
   headers: Record<string, string | string[]>
   cookies: Record<string, string>
   ip: string | null
+  callbackSenderIp: string | null
   sender?: WebhookSenderInfo
   body: WebhookStoredBody
   response: WebhookResponseInfo
