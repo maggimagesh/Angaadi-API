@@ -21,6 +21,54 @@ export interface WebhookResponseInfo {
   text: string | null
 }
 
+export interface WebhookSenderGeo {
+  country: string | null
+  region: string | null
+  city: string | null
+  latitude: string | null
+  longitude: string | null
+  timezone: string | null
+  source: string | null
+}
+
+export interface WebhookForwardedInfo {
+  for: string[]
+  proto: string | null
+  host: string | null
+  port: string | null
+  raw: string | null
+}
+
+export interface WebhookSenderInfo {
+  ip: string | null
+  ipSource: string | null
+  ipChain: string[]
+  remoteAddress: string | null
+  remotePort: number | null
+  remoteFamily: string | null
+  reverseDns: string[] | null
+  userAgent: string | null
+  clientApp: string | null
+  httpVersion: string | null
+  protocol: 'http' | 'https' | null
+  secureConnection: boolean
+  host: string | null
+  origin: string | null
+  referer: string | null
+  accept: string | null
+  acceptLanguage: string | null
+  acceptEncoding: string | null
+  contentType: string | null
+  contentLength: number | null
+  transferEncoding: string | null
+  connection: string | null
+  authorizationPresent: boolean
+  signatureHeaders: Record<string, string>
+  forwarded: WebhookForwardedInfo
+  proxyHeaders: Record<string, string>
+  geo: WebhookSenderGeo | null
+}
+
 export interface WebhookCaptureRecord {
   id: string
   token: string
@@ -32,6 +80,7 @@ export interface WebhookCaptureRecord {
   headers: Record<string, string | string[]>
   cookies: Record<string, string>
   ip: string | null
+  sender?: WebhookSenderInfo
   body: WebhookStoredBody
   response: WebhookResponseInfo
 }

@@ -1,10 +1,19 @@
 import { randomUUID } from 'crypto'
+import { promises as dns } from 'dns'
 import { createWriteStream, promises as fsp, type WriteStream } from 'fs'
 import path from 'path'
 import type { IncomingHttpHeaders } from 'http'
 import type { ParsedUrlQuery } from 'querystring'
 import type { NextApiRequest } from 'next'
-import type { WebhookCaptureListResponse, WebhookCaptureRecord, WebhookResponseInfo, WebhookStoredBody } from '@/types/webhook'
+import type {
+  WebhookCaptureListResponse,
+  WebhookCaptureRecord,
+  WebhookForwardedInfo,
+  WebhookResponseInfo,
+  WebhookSenderGeo,
+  WebhookSenderInfo,
+  WebhookStoredBody,
+} from '@/types/webhook'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
 const JSON_RESPONSE_HEADERS = {
@@ -322,14 +331,316 @@ function getConfiguredInspectorBasePath(): string {
   return normalizeBasePath(process.env.WEBHOOK_INSPECTOR_BASE_PATH || '/valid-webhooks')
 }
 
-function getClientIpAddress(req: NextApiRequest): string | null {
-  const forwardedFor = getSingleHeaderValue(req.headers['x-forwarded-for'])
+function normalizeIp(value: string | null | undefined): string | null {
+  if (!value) {
+    return null
+  }
+  const trimmed = value.trim().replace(/^::ffff:/i, '')
+  return trimmed || null
+}
 
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0]?.trim() || null
+const CLIENT_IP_HEADER_CANDIDATES = [
+  'cf-connecting-ip',
+  'true-client-ip',
+  'fastly-client-ip',
+  'fly-client-ip',
+  'x-real-ip',
+  'x-client-ip',
+  'x-appengine-user-ip',
+  'x-azure-clientip',
+] as const
+
+const PROXY_HEADER_NAMES = [
+  'x-forwarded-for',
+  'x-forwarded-proto',
+  'x-forwarded-host',
+  'x-forwarded-port',
+  'forwarded',
+  'via',
+  'x-real-ip',
+  'x-client-ip',
+  'true-client-ip',
+  'cf-connecting-ip',
+  'cf-ray',
+  'cf-ipcountry',
+  'cf-visitor',
+  'cf-worker',
+  'fastly-client-ip',
+  'fly-client-ip',
+  'fly-forwarded-proto',
+  'x-vercel-id',
+  'x-vercel-forwarded-for',
+  'x-vercel-ip-country',
+  'x-vercel-ip-country-region',
+  'x-vercel-ip-city',
+  'x-vercel-ip-latitude',
+  'x-vercel-ip-longitude',
+  'x-vercel-ip-timezone',
+  'x-amzn-trace-id',
+  'x-amz-cf-id',
+  'x-request-id',
+  'x-correlation-id',
+  'x-railway-request-id',
+  'x-render-origin-server',
+  'x-appengine-user-ip',
+  'x-appengine-country',
+  'x-appengine-region',
+  'x-appengine-city',
+  'x-appengine-citylatlong',
+  'x-azure-clientip',
+  'x-azure-socketip',
+] as const
+
+const SIGNATURE_HEADER_PATTERN = /(signature|hmac|digest|x-hub-signature|x-webhook|idempotency-key|event-id|delivery)/i
+
+const CLIENT_APP_PATTERNS: Array<[RegExp, string]> = [
+  [/github-hookshot/i, 'GitHub webhooks'],
+  [/stripe/i, 'Stripe webhooks'],
+  [/razorpay/i, 'Razorpay webhooks'],
+  [/shopify/i, 'Shopify webhooks'],
+  [/twilio/i, 'Twilio'],
+  [/paypal/i, 'PayPal'],
+  [/slack/i, 'Slack'],
+  [/postmanruntime/i, 'Postman'],
+  [/insomnia/i, 'Insomnia'],
+  [/curl\//i, 'curl'],
+  [/wget/i, 'Wget'],
+  [/axios/i, 'axios'],
+  [/node-fetch|undici|node\.js/i, 'Node.js HTTP client'],
+  [/go-http-client/i, 'Go HTTP client'],
+  [/python-requests/i, 'Python requests'],
+  [/python-urllib|python-httpx|\bhttpx\b|aiohttp/i, 'Python HTTP client'],
+  [/okhttp/i, 'OkHttp (Java/Android)'],
+  [/apache-httpclient|java\//i, 'Java HTTP client'],
+  [/guzzlehttp/i, 'Guzzle (PHP)'],
+  [/dart:io|dart\//i, 'Dart/Flutter HTTP client'],
+  [/mozilla\/.*(chrome|safari|firefox|edg|opr)/i, 'Web browser'],
+]
+
+function detectClientApp(userAgent: string | null): string | null {
+  if (!userAgent) {
+    return null
   }
 
-  return req.socket.remoteAddress || null
+  for (const [pattern, label] of CLIENT_APP_PATTERNS) {
+    if (pattern.test(userAgent)) {
+      return label
+    }
+  }
+
+  return null
+}
+
+function parseForwardedHeader(raw: string | null): WebhookForwardedInfo {
+  const info: WebhookForwardedInfo = { for: [], proto: null, host: null, port: null, raw }
+
+  if (!raw) {
+    return info
+  }
+
+  for (const element of raw.split(',')) {
+    for (const pair of element.split(';')) {
+      const [rawKey, ...rawValue] = pair.split('=')
+      const key = rawKey?.trim().toLowerCase()
+      const value = rawValue.join('=').trim().replace(/^"|"$/g, '')
+
+      if (!key || !value) {
+        continue
+      }
+
+      if (key === 'for') {
+        info.for.push(value)
+      } else if (key === 'proto' && !info.proto) {
+        info.proto = value
+      } else if (key === 'host' && !info.host) {
+        info.host = value
+      } else if (key === 'port' && !info.port) {
+        info.port = value
+      }
+    }
+  }
+
+  return info
+}
+
+function collectGeoHints(req: NextApiRequest): WebhookSenderGeo | null {
+  const header = (name: string) => getSingleHeaderValue(req.headers[name])
+
+  if (header('cf-ipcountry')) {
+    return {
+      country: header('cf-ipcountry'),
+      region: null,
+      city: null,
+      latitude: null,
+      longitude: null,
+      timezone: null,
+      source: 'Cloudflare headers',
+    }
+  }
+
+  if (header('x-vercel-ip-country')) {
+    return {
+      country: header('x-vercel-ip-country'),
+      region: header('x-vercel-ip-country-region'),
+      city: header('x-vercel-ip-city'),
+      latitude: header('x-vercel-ip-latitude'),
+      longitude: header('x-vercel-ip-longitude'),
+      timezone: header('x-vercel-ip-timezone'),
+      source: 'Vercel headers',
+    }
+  }
+
+  if (header('x-appengine-country')) {
+    const [latitude, longitude] = (header('x-appengine-citylatlong') || '').split(',')
+    return {
+      country: header('x-appengine-country'),
+      region: header('x-appengine-region'),
+      city: header('x-appengine-city'),
+      latitude: latitude?.trim() || null,
+      longitude: longitude?.trim() || null,
+      timezone: null,
+      source: 'Google App Engine headers',
+    }
+  }
+
+  return null
+}
+
+function resolveClientIp(req: NextApiRequest): { ip: string | null; ipSource: string | null } {
+  for (const headerName of CLIENT_IP_HEADER_CANDIDATES) {
+    const value = normalizeIp(getSingleHeaderValue(req.headers[headerName])?.split(',')[0])
+    if (value) {
+      return { ip: value, ipSource: `${headerName} header` }
+    }
+  }
+
+  const forwardedFor = normalizeIp(getSingleHeaderValue(req.headers['x-forwarded-for'])?.split(',')[0])
+  if (forwardedFor) {
+    return { ip: forwardedFor, ipSource: 'x-forwarded-for header' }
+  }
+
+  const forwarded = parseForwardedHeader(getSingleHeaderValue(req.headers.forwarded))
+  const forwardedIp = normalizeIp(forwarded.for[0]?.replace(/^\[|\]$/g, '').split(']:')[0]?.split(':')[0])
+  if (forwardedIp) {
+    return { ip: forwardedIp, ipSource: 'forwarded header' }
+  }
+
+  const socketIp = normalizeIp(req.socket.remoteAddress)
+  if (socketIp) {
+    return { ip: socketIp, ipSource: 'socket remote address' }
+  }
+
+  return { ip: null, ipSource: null }
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (!value) {
+    return null
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
+  const header = (name: string) => getSingleHeaderValue(req.headers[name])
+  const { ip, ipSource } = resolveClientIp(req)
+  const remoteAddress = normalizeIp(req.socket.remoteAddress)
+
+  const forwardedForChain = (header('x-forwarded-for') || '')
+    .split(',')
+    .map((entry) => normalizeIp(entry))
+    .filter((entry): entry is string => Boolean(entry))
+
+  const ipChain = [...forwardedForChain]
+  if (remoteAddress && !ipChain.includes(remoteAddress)) {
+    ipChain.push(remoteAddress)
+  }
+
+  const proxyHeaders: Record<string, string> = {}
+  for (const name of PROXY_HEADER_NAMES) {
+    const value = header(name)
+    if (value) {
+      proxyHeaders[name] = value
+    }
+  }
+
+  const signatureHeaders: Record<string, string> = {}
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (typeof value !== 'undefined' && SIGNATURE_HEADER_PATTERN.test(name)) {
+      signatureHeaders[name] = Array.isArray(value) ? value.join(', ') : value
+    }
+  }
+
+  const secureConnection = Boolean((req.socket as { encrypted?: boolean }).encrypted)
+  const forwardedProto = header('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
+  const protocol: 'http' | 'https' =
+    forwardedProto === 'https' || forwardedProto === 'http'
+      ? forwardedProto
+      : secureConnection
+        ? 'https'
+        : 'http'
+
+  const userAgent = header('user-agent')
+
+  return {
+    ip,
+    ipSource,
+    ipChain,
+    remoteAddress,
+    remotePort: req.socket.remotePort ?? null,
+    remoteFamily: req.socket.remoteFamily ?? null,
+    reverseDns: null,
+    userAgent,
+    clientApp: detectClientApp(userAgent),
+    httpVersion: req.httpVersion || null,
+    protocol,
+    secureConnection,
+    host: header('x-forwarded-host')?.split(',')[0]?.trim() || header('host'),
+    origin: header('origin'),
+    referer: header('referer') || header('referrer'),
+    accept: header('accept'),
+    acceptLanguage: header('accept-language'),
+    acceptEncoding: header('accept-encoding'),
+    contentType: header('content-type'),
+    contentLength: parseContentLength(header('content-length')),
+    transferEncoding: header('transfer-encoding'),
+    connection: header('connection'),
+    authorizationPresent: Boolean(header('authorization') || header('proxy-authorization')),
+    signatureHeaders,
+    forwarded: parseForwardedHeader(header('forwarded')),
+    proxyHeaders,
+    geo: collectGeoHints(req),
+  }
+}
+
+const REVERSE_DNS_TIMEOUT_MS = 2000
+
+function scheduleReverseDnsLookup(sender: WebhookSenderInfo): void {
+  const target = sender.ip || sender.remoteAddress
+  if (!target) {
+    sender.reverseDns = []
+    return
+  }
+
+  void (async () => {
+    let timer: NodeJS.Timeout | undefined
+    try {
+      const names = await Promise.race([
+        dns.reverse(target),
+        new Promise<string[]>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('reverse DNS timeout')), REVERSE_DNS_TIMEOUT_MS)
+          timer.unref?.()
+        }),
+      ])
+      sender.reverseDns = names
+    } catch {
+      sender.reverseDns = []
+    } finally {
+      if (timer) {
+        clearTimeout(timer)
+      }
+    }
+  })()
 }
 
 function getStorageRoot(): string {
@@ -513,6 +824,7 @@ export async function captureWebhookRequest(
   const { captureUrl, inspectUrl } = buildWebhookUrls(req, safeToken)
   const method = req.method?.toUpperCase() || 'GET'
   const contentTypeHeader = getSingleHeaderValue(req.headers['content-type'])
+  const sender = collectSenderInfo(req)
 
   const bodyResult = await readAndStoreBody(req, safeToken, requestId)
 
@@ -546,6 +858,7 @@ export async function captureWebhookRequest(
     requestUrl,
     captureUrl,
     inspectUrl,
+    senderIp: sender.ip,
     sizeBytes: storedBody.sizeBytes,
     truncated: Boolean(storedBody.truncated),
   }
@@ -567,13 +880,15 @@ export async function captureWebhookRequest(
     query: normalizeQuery(queryWithoutRouteParams),
     headers: normalizeHeaders(req.headers),
     cookies: parseCookies(getSingleHeaderValue(req.headers.cookie)),
-    ip: getClientIpAddress(req),
+    ip: sender.ip,
+    sender,
     body: storedBody,
     response,
     bodyFilePath,
   }
 
   await persistWebhookRecord(safeToken, record)
+  scheduleReverseDnsLookup(sender)
 
   return {
     record: publicRecord(record),
