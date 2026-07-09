@@ -96,4 +96,37 @@ export interface WebhookCaptureListResponse {
   captureUrl: string
   inspectUrl: string
   requests: WebhookCaptureRecord[]
+  authEnabled?: boolean
+  blocked?: WebhookBlockedRecord[]
+}
+
+export interface WebhookAuthHeader {
+  name: string
+  value: string
+}
+
+export interface WebhookAuthConfig {
+  enabled: boolean
+  headers: WebhookAuthHeader[]
+  updatedAt: string | null
+}
+
+export type WebhookBlockedReason = 'missing-header' | 'header-mismatch'
+
+export interface WebhookBlockedRecord {
+  id: string
+  token: string
+  receivedAt: string
+  method: string
+  path: string
+  url: string
+  ip: string | null
+  ipSource: string | null
+  userAgent: string | null
+  clientApp: string | null
+  host: string | null
+  origin: string | null
+  reason: WebhookBlockedReason
+  missingHeaders: string[]
+  mismatchedHeaders: string[]
 }

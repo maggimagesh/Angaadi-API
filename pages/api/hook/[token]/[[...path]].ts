@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 import { applyPublicWebhookCors } from '@/utils/publicWebhookCors'
+import { checkWebhookAuth, getWebhookAuthConfig, recordBlockedAttempt } from '@/utils/webhookAuth'
 import { captureWebhookRequest } from '@/utils/webhookInbox'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
@@ -45,6 +46,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!token || !isValidWebhookToken(token)) {
     res.status(400).json({ error: 'Invalid webhook token' })
+    return
+  }
+
+  const authConfig = await getWebhookAuthConfig(token)
+  const authResult = checkWebhookAuth(req, authConfig)
+
+  if (!authResult.ok) {
+    recordBlockedAttempt(req, token, getRoutePath(req.query.path), authResult)
+    res.status(401).json({
+      error: 'Unauthorized: this webhook requires authorization headers that were missing or invalid',
+    })
     return
   }
 

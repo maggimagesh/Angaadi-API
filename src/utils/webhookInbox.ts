@@ -575,7 +575,7 @@ function parseContentLength(value: string | null): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 }
 
-function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
+export function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
   const header = (name: string) => getSingleHeaderValue(req.headers[name])
   const { ip, ipSource } = resolveClientIp(req)
   const callbackSender = resolveCallbackSenderIp(req, { ip, ipSource })
@@ -687,7 +687,7 @@ function scheduleReverseDnsLookup(sender: WebhookSenderInfo): void {
   })()
 }
 
-function getStorageRoot(): string {
+export function getStorageRoot(): string {
   return process.env.WEBHOOK_BODY_DIR || path.join(process.cwd(), 'data', 'webhook_inbox')
 }
 

@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 import { applyPublicWebhookCors } from '@/utils/publicWebhookCors'
-import { getWebhookAuthConfig, listBlockedAttempts } from '@/utils/webhookAuth'
-import { clearStoredWebhookRequests, listStoredWebhookRequests } from '@/utils/webhookInbox'
+import { clearBlockedAttempts, listBlockedAttempts } from '@/utils/webhookAuth'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
 function getRouteToken(value: string | string[] | undefined): string | null {
@@ -35,35 +34,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === 'GET') {
-      const payload = await listStoredWebhookRequests(req, token)
-      const authConfig = await getWebhookAuthConfig(token)
-      res.status(200).json({
-        ...payload,
-        authEnabled: authConfig.enabled,
-        blocked: listBlockedAttempts(token),
-      })
+      res.status(200).json({ token, blocked: listBlockedAttempts(token) })
       return
     }
 
     if (req.method === 'DELETE') {
-      const currentPayload = await listStoredWebhookRequests(req, token)
-      await clearStoredWebhookRequests(token)
-
-      res.status(200).json({
-        ok: true,
-        token,
-        deleted: currentPayload.requests.length,
-      })
+      const deleted = clearBlockedAttempts(token)
+      res.status(200).json({ ok: true, token, deleted })
       return
     }
 
     res.setHeader('Allow', ['GET', 'DELETE', 'OPTIONS'])
-    res.status(405).json({
-      error: `Method ${req.method} Not Allowed`,
-      hint: `Send callback payloads to /hook/${token} or /api/webhook/${token}. Use this /requests path only for GET and DELETE.`,
-    })
+    res.status(405).json({ error: `Method ${req.method} Not Allowed` })
   } catch (error) {
-    console.error('Webhook inspector request failed:', error)
-    res.status(500).json({ error: 'Failed to load webhook requests' })
+    console.error('Webhook blocked-attempts request failed:', error)
+    res.status(500).json({ error: 'Failed to process blocked webhook attempts' })
   }
 }

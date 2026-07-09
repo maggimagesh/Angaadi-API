@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "headers": [
+    {
+      "name": "X-Webhook-Key",
+      "value": "156244347b8fd1d401571c939d9ed45b0e8ff5292889d4a8"
+    }
+  ],
+  "updatedAt": "2026-07-09T06:26:27.765Z"
+}
