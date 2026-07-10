@@ -979,6 +979,41 @@ export async function getStoredWebhookRequest(
   }
 }
 
+export function getInlineBodyBuffer(body: WebhookStoredBody): Buffer {
+  if (body.text !== null && body.text !== undefined) {
+    return Buffer.from(body.text, 'utf8')
+  }
+  if (body.json !== null && body.json !== undefined) {
+    return Buffer.from(JSON.stringify(body.json, null, 2), 'utf8')
+  }
+  if (body.base64) {
+    return Buffer.from(body.base64, 'base64')
+  }
+  return Buffer.alloc(0)
+}
+
+export interface StoredWebhookBodySource {
+  id: string
+  receivedAt: string
+  method: string
+  contentType: string | null
+  bodyFilePath: string | null
+  inlineBody: Buffer | null
+}
+
+export function listStoredWebhookBodySources(token: string): StoredWebhookBodySource[] {
+  const safeToken = assertWebhookToken(token)
+  const records = getWebhookCaptureStore().get(safeToken) || []
+  return records.map((record) => ({
+    id: record.id,
+    receivedAt: record.receivedAt,
+    method: record.method,
+    contentType: record.body.contentType,
+    bodyFilePath: record.bodyFilePath || null,
+    inlineBody: record.bodyFilePath ? null : getInlineBodyBuffer(record.body),
+  }))
+}
+
 export async function clearStoredWebhookRequests(token: string): Promise<void> {
   const safeToken = assertWebhookToken(token)
   const store = getWebhookCaptureStore()

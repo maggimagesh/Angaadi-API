@@ -3,7 +3,7 @@ import { createReadStream } from 'fs'
 import { stat } from 'fs/promises'
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 import { applyPublicWebhookCors } from '@/utils/publicWebhookCors'
-import { getStoredWebhookRequest } from '@/utils/webhookInbox'
+import { getInlineBodyBuffer, getStoredWebhookRequest } from '@/utils/webhookInbox'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
 export const config = {
@@ -102,16 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return
     }
 
-    let buffer: Buffer
-    if (record.body.format === 'json' && record.body.json !== null) {
-      buffer = Buffer.from(JSON.stringify(record.body.json, null, 2), 'utf8')
-    } else if (record.body.text !== null) {
-      buffer = Buffer.from(record.body.text, 'utf8')
-    } else if (record.body.base64) {
-      buffer = Buffer.from(record.body.base64, 'base64')
-    } else {
-      buffer = Buffer.alloc(0)
-    }
+    const buffer = getInlineBodyBuffer(record.body)
 
     res.setHeader('Content-Length', String(buffer.length))
     if (req.method === 'HEAD') {
