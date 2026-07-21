@@ -1256,6 +1256,1225 @@ export default function SwaggerUIComponent() {
             500: { description: "Internal server error" }
           }
         }
+      },
+      "/api/v1/cart": {
+        get: {
+          tags: ["Cart"],
+          summary: "Fetch the authenticated user's cart",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: "Cart contents with per-item totals and a summary",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      items: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            itemId: { type: "string", example: "1" },
+                            productId: { type: "number", example: 12 },
+                            quantity: { type: "number", example: 2 },
+                            product: {
+                              type: "object",
+                              properties: {
+                                id: { type: "number", example: 12 },
+                                name: { type: "string", example: "Example Product" },
+                                brand: { type: "string", example: "Acme" },
+                                imageurl: { type: "string", example: "https://example.com/product.jpg" },
+                                freedelivery: { type: "boolean", example: true },
+                                price: { type: "number", example: 999 },
+                                oldprice: { type: "number", example: 1299 },
+                                discountpercent: { type: "number", example: 23 },
+                                category: { type: "string", example: "Shoes", nullable: true }
+                              }
+                            },
+                            totals: {
+                              type: "object",
+                              properties: {
+                                total: { type: "number", example: 1998 },
+                                youSave: { type: "number", example: 600 }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      summary: {
+                        type: "object",
+                        properties: {
+                          subtotal: { type: "number", example: 1998 },
+                          youSave: { type: "number", example: 600 },
+                          deliveryFee: { type: "number", example: 0 },
+                          tax: { type: "number", example: 0 },
+                          total: { type: "number", example: 1998 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        },
+        post: {
+          tags: ["Cart"],
+          summary: "Add a product to the cart",
+          description: "Adds the product to the cart, or increments the quantity if it is already present. Returns the full updated cart.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["productId"],
+                  properties: {
+                    productId: { type: "number", example: 12 },
+                    quantity: { type: "number", example: 1, default: 1 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            201: { description: "Updated cart (same shape as GET /api/v1/cart)" },
+            400: {
+              description: "Bad request - invalid productId/quantity, or product not found",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { error: { type: "string", example: "Product not found" } }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        },
+        delete: {
+          tags: ["Cart"],
+          summary: "Remove a product from the cart",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["productId"],
+                  properties: {
+                    productId: { type: "number", example: 12 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: "Updated cart (same shape as GET /api/v1/cart)" },
+            400: {
+              description: "Bad request - invalid productId, or item not in cart",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { error: { type: "string", example: "Cart item not found" } }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/products": {
+        get: {
+          tags: ["Products"],
+          summary: "Fetch all active products",
+          responses: {
+            200: {
+              description: "List of products",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      products: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "number", example: 12 },
+                            productname: { type: "string", example: "Example Product" },
+                            brand: { type: "string", example: "Acme" },
+                            price: { type: "number", example: 999 },
+                            oldprice: { type: "number", example: 1299 },
+                            stock: { type: "number", example: 15 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/products/{productId}": {
+        get: {
+          tags: ["Products"],
+          summary: "Fetch a single product by id",
+          parameters: [
+            {
+              name: "productId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Product record",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      product: {
+                        type: "object",
+                        properties: {
+                          id: { type: "number", example: 12 },
+                          productname: { type: "string", example: "Example Product" },
+                          brand: { type: "string", example: "Acme" },
+                          price: { type: "number", example: 999 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid product ID" },
+            404: { description: "Product not found" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/products/by-category": {
+        post: {
+          tags: ["Products"],
+          summary: "Fetch products by category id",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["categoryid"],
+                  properties: {
+                    categoryid: { type: "number", example: 3 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "List of products in the category",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      products: { type: "array", items: { type: "object" } }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid category ID" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/products/by-ids": {
+        post: {
+          tags: ["Products"],
+          summary: "Fetch a single product by category id and product id",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["categoryId", "productId"],
+                  properties: {
+                    categoryId: { type: "number", example: 3 },
+                    productId: { type: "number", example: 12 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Matching product",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { product: { type: "object" } }
+                  }
+                }
+              }
+            },
+            400: { description: "Missing or invalid categoryId/productId" },
+            404: { description: "Product not found" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/shoe-size": {
+        get: {
+          tags: ["Shoe Size"],
+          summary: "Fetch all available shoe sizes and widths",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: {
+              description: "Distinct shoe sizes and widths",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      shoeSizes: { type: "array", items: { type: "number" }, example: [7, 8, 9, 10] },
+                      widths: { type: "array", items: { type: "string" }, example: ["Narrow", "Regular", "Wide"] }
+                    }
+                  }
+                }
+              }
+            },
+            401: { description: "Unauthorized" },
+            500: { description: "Internal server error" }
+          }
+        },
+        post: {
+          tags: ["Shoe Size"],
+          summary: "Save the user's shoe size selection",
+          description: "Looks up the shoe size record for the given size/width pair and activates it for the user.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["userId", "size", "width"],
+                  properties: {
+                    userId: { type: "string", example: "15" },
+                    size: { type: "number", example: 9 },
+                    width: { type: "string", example: "Regular" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            201: {
+              description: "Shoe size saved successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      userShoeSize: { type: "object" },
+                      message: { type: "string", example: "Shoe size saved successfully" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Missing or invalid userId/size/width" },
+            401: { description: "Unauthorized" },
+            404: { description: "Shoe size or user not found" },
+            409: { description: "Conflict - this shoe size is already active for the user" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/shoe-size/{userId}": {
+        get: {
+          tags: ["Shoe Size"],
+          summary: "Fetch the user's active shoe size",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "15" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "User's active shoe size",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { userShoeSize: { type: "object" } }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid userId" },
+            401: { description: "Unauthorized" },
+            403: { description: "Forbidden - userId does not match the authenticated user" },
+            404: { description: "No active shoe size found for this user" },
+            500: { description: "Internal server error" }
+          }
+        },
+        delete: {
+          tags: ["Shoe Size"],
+          summary: "Deactivate the user's shoe size",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "15" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Shoe size selection removed successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { message: { type: "string", example: "Shoe size selection removed successfully" } }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid userId" },
+            401: { description: "Unauthorized" },
+            403: { description: "Forbidden - userId does not match the authenticated user" },
+            404: { description: "No active shoe size found for this user" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/users/forgot-password": {
+        post: {
+          tags: ["Users"],
+          summary: "Request a password reset OTP",
+          description: "Sends a one-time password to the user's email if an account exists for it.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["email"],
+                  properties: { email: { type: "string", example: "john.doe@example.com" } }
+                }
+              }
+            }
+          },
+          responses: {
+            201: { description: "OTP sent" },
+            400: { description: "Missing or invalid email" },
+            404: { description: "User not available" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/users/verify-otp": {
+        post: {
+          tags: ["Users"],
+          summary: "Verify a password reset OTP",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["email", "otp"],
+                  properties: {
+                    email: { type: "string", example: "john.doe@example.com" },
+                    otp: { type: "string", example: "123456" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            201: {
+              description: "OTP verified - returns a reset token to use with reset-password",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { resetToken: { type: "string" } }
+                  }
+                }
+              }
+            },
+            400: { description: "Missing/invalid email or OTP format" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/users/reset-password": {
+        post: {
+          tags: ["Users"],
+          summary: "Reset password using a verified reset token",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["resetToken", "newPassword", "confirmPassword"],
+                  properties: {
+                    resetToken: { type: "string" },
+                    newPassword: { type: "string", example: "NewPassword123" },
+                    confirmPassword: { type: "string", example: "NewPassword123" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            201: { description: "Password reset successfully" },
+            400: { description: "Passwords do not match, password too short, or invalid/expired reset token" },
+            500: { description: "Internal server error" }
+          }
+        }
+      },
+      "/api/v1/users/oauth-signin": {
+        post: {
+          tags: ["Users"],
+          summary: "Start Google OAuth sign-in",
+          description: "Returns an authorization URL to redirect the client to for Google OAuth. On completion Google redirects to /api/v1/users/oauth-callback.",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    provider: { type: "string", enum: ["google"], example: "google" },
+                    redirectTo: { type: "string", example: "https://app.example.com/api/v1/users/oauth-callback" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            201: {
+              description: "Authorization URL generated",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      url: { type: "string", example: "https://accounts.google.com/o/oauth2/..." },
+                      provider: { type: "string", example: "google" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Unsupported provider" },
+            500: { description: "Failed to initiate OAuth sign-in" }
+          }
+        }
+      },
+      "/api/v1/users/oauth-callback": {
+        get: {
+          tags: ["Users"],
+          summary: "Google OAuth callback",
+          description: "Exchanges the authorization code for a session, creates or reuses the local user record, and issues a JWT. Returns JSON for popup/JSON requests, otherwise redirects with the token in the query string.",
+          parameters: [
+            {
+              name: "code",
+              in: "query",
+              required: false,
+              description: "Authorization code returned by Google",
+              schema: { type: "string" }
+            },
+            {
+              name: "error",
+              in: "query",
+              required: false,
+              description: "Present if the OAuth provider returned an error instead of a code",
+              schema: { type: "string" }
+            },
+            {
+              name: "popup",
+              in: "query",
+              required: false,
+              description: "Set to 'true' to receive a JSON response instead of a redirect",
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "OAuth authentication successful (JSON response for popup/JSON requests)",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      user: { type: "object" },
+                      token: { type: "string" },
+                      message: { type: "string", example: "OAuth authentication successful" },
+                      popup: { type: "boolean", example: true }
+                    }
+                  }
+                }
+              }
+            },
+            302: { description: "Redirect to the configured success URL with token and user in the query string" },
+            400: { description: "Missing authorization code, OAuth error, or missing user email" },
+            500: { description: "Failed to exchange authorization code" }
+          }
+        }
+      },
+      "/api/v1/secure/handshake": {
+        post: {
+          tags: ["Secure Proxy"],
+          summary: "Establish an encrypted session (ECDH key exchange)",
+          description: "Ephemeral ECDH (P-256) key exchange used by the encrypted request tunnel. The client sends its ephemeral public key; the server derives an AES-256-GCM session key and returns its own public key plus an opaque session token. No session state is stored server-side.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["pub"],
+                  properties: {
+                    pub: { type: "string", description: "Client's base64url-encoded ephemeral P-256 public key" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Session established",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      pub: { type: "string", description: "Server's ephemeral public key" },
+                      token: { type: "string", description: "Opaque session token (session key wrapped under the server master key)" },
+                      exp: { type: "number", description: "Session expiry (epoch ms)" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Missing or invalid client public key" },
+            429: { description: "Too many requests" }
+          }
+        }
+      },
+      "/api/v1/secure/proxy": {
+        post: {
+          tags: ["Secure Proxy"],
+          summary: "Tunnel an encrypted request to the internal API",
+          description: "The client sends an AES-256-GCM encrypted envelope describing the real request (path, method, headers, body) for a session created via /api/v1/secure/handshake. The proxy validates it against the route allowlist, forwards it to the internal /api/v1 API, and returns the response encrypted under the same session key. The HTTP status of this endpoint is always 200 for successfully tunneled requests - the real upstream status travels inside the encrypted envelope.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["t", "iv", "d"],
+                  properties: {
+                    t: { type: "string", description: "Session token from the handshake" },
+                    iv: { type: "string", description: "Base64url-encoded AES-GCM initialization vector" },
+                    d: { type: "string", description: "Base64url-encoded encrypted envelope" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Encrypted envelope containing the upstream status and body",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      iv: { type: "string" },
+                      d: { type: "string", description: "Encrypted { s: upstreamStatus, b: upstreamBody }" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Malformed request, decryption failed, or stale/replayed nonce" },
+            401: { description: "Invalid or expired session - client should re-handshake" },
+            403: { description: "Target path/method not on the allowlist" },
+            413: { description: "Request body too large" },
+            429: { description: "Too many requests" }
+          }
+        }
+      },
+      "/api/v1/loop": {
+        get: {
+          tags: ["Test Fixtures"],
+          summary: "Simulated infinite-loop response",
+          description: "Always responds with HTTP 508 Loop Detected (RFC 5842). Used to test client handling of loop-detection responses.",
+          responses: {
+            508: {
+              description: "Loop detected",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      status: { type: "string", example: "Loop Detected" },
+                      code: { type: "number", example: 508 },
+                      message: { type: "string" },
+                      hint: { type: "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/status/400/{id}": {
+        get: {
+          tags: ["Test Fixtures"],
+          summary: "Crawler test fixture - always returns 400",
+          description: "Always responds 400 Bad Request regardless of HTTP method or the :id value. Backs the 100 links on the /bad-request fixture page; :id (1-100) only exists so each link is a distinct URL that crawlers will not dedupe.",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "1" }
+            }
+          ],
+          responses: {
+            400: {
+              description: "Intentional bad request",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Bad Request" },
+                      statusCode: { type: "number", example: 400 },
+                      message: { type: "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/callback": {
+        get: {
+          tags: ["Callback Storage"],
+          summary: "List stored callback payloads",
+          description: "Returns every JSON chunk previously saved via POST, grouped by recordId folder. Publicly aliased at /callback.",
+          responses: {
+            200: {
+              description: "Stored callback records",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        recordName: { type: "string", example: "Record_abc123" },
+                        files: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              fileName: { type: "string", example: "1700000000000_a1b2c3.json" },
+                              data: { type: "object" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            500: { description: "Internal server error" }
+          }
+        },
+        post: {
+          tags: ["Callback Storage"],
+          summary: "Store a callback payload",
+          description: "Streams the raw JSON body to disk under data/callback_OP/Record_<recordId>, where recordId is read from body.responseSet[0].recordId. Publicly aliased at /callback.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    responseSet: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: { recordId: { type: "string", example: "abc123" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: { description: "Chunk saved in folder Record_<recordId>" },
+            400: { description: "Invalid JSON, or no/invalid recordId in the payload" },
+            500: { description: "Internal server error during upload" }
+          }
+        }
+      },
+      "/api/hook/{token}": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request",
+          description: "Captures any HTTP request sent to this URL (headers, query, body, sender info) for later inspection via /api/webhook/{token}/requests. Accepts GET, POST, PUT, PATCH, DELETE and HEAD - the response is identical regardless of method. Also reachable via the public aliases /hook/{token} and /valid-webhooks/{token}, and with an extra catch-all path segment, e.g. /api/hook/{token}/any/sub/path.",
+          parameters: [
+            {
+              name: "token",
+              in: "path",
+              required: true,
+              description: "Webhook token (10-128 chars, letters/digits/_/-)",
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Request captured",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      message: { type: "string", example: "Request captured" },
+                      token: { type: "string" },
+                      requestId: { type: "string" },
+                      receivedAt: { type: "string" },
+                      method: { type: "string", example: "POST" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        },
+        post: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request (POST)",
+          description: "Identical capture behavior to GET on this path - see the GET operation for details.",
+          parameters: [
+            {
+              name: "token",
+              in: "path",
+              required: true,
+              description: "Webhook token (10-128 chars, letters/digits/_/-)",
+              schema: { type: "string" }
+            }
+          ],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: { type: "object" } } }
+          },
+          responses: {
+            200: { description: "Request captured (same shape as GET on this path)" },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        },
+        put: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request (PUT)",
+          description: "Identical capture behavior to GET on this path - see the GET operation for details.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: { type: "object" } } }
+          },
+          responses: {
+            200: { description: "Request captured (same shape as GET on this path)" },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        },
+        patch: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request (PATCH)",
+          description: "Identical capture behavior to GET on this path - see the GET operation for details.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: { type: "object" } } }
+          },
+          responses: {
+            200: { description: "Request captured (same shape as GET on this path)" },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        },
+        delete: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request (DELETE)",
+          description: "Identical capture behavior to GET on this path - see the GET operation for details.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: { description: "Request captured (same shape as GET on this path)" },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        }
+      },
+      "/api/webhook/{token}": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Capture an inbound webhook request (API-namespaced alias)",
+          description: "Same capture behavior as /api/hook/{token}. Accepts GET, POST, PUT, PATCH and DELETE.",
+          parameters: [
+            {
+              name: "token",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: { description: "Request captured (same shape as /api/hook/{token})" },
+            400: { description: "Invalid webhook token" },
+            401: { description: "Unauthorized - missing/invalid authorization headers" },
+            413: { description: "Webhook body exceeds maximum allowed size" },
+            500: { description: "Failed to capture webhook request" }
+          }
+        }
+      },
+      "/api/webhook/{token}/requests": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "List captured requests for a webhook token",
+          parameters: [
+            {
+              name: "token",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Captured requests plus auth/blocked state",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      captureUrl: { type: "string" },
+                      inspectUrl: { type: "string" },
+                      requests: { type: "array", items: { type: "object" } },
+                      authEnabled: { type: "boolean" },
+                      blocked: { type: "array", items: { type: "object" } }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to load webhook requests" }
+          }
+        },
+        delete: {
+          tags: ["Webhook Capture"],
+          summary: "Clear all captured requests for a webhook token",
+          parameters: [
+            {
+              name: "token",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Requests cleared",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      deleted: { type: "number", example: 3 }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to load webhook requests" }
+          }
+        }
+      },
+      "/api/webhook/{token}/auth": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Get the authorization requirement for a webhook token",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Current auth config",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string" },
+                      config: {
+                        type: "object",
+                        properties: {
+                          enabled: { type: "boolean" },
+                          headers: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                name: { type: "string", example: "x-api-key" },
+                                value: { type: "string", example: "secret123" }
+                              }
+                            }
+                          },
+                          updatedAt: { type: "string", nullable: true }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process webhook authorization settings" }
+          }
+        },
+        put: {
+          tags: ["Webhook Capture"],
+          summary: "Require specific headers on inbound webhook requests",
+          description: "Configures required-header authorization for this webhook token. Requests missing/mismatching a required header are rejected with 401 and recorded as blocked attempts.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["enabled", "headers"],
+                  properties: {
+                    enabled: { type: "boolean", example: true },
+                    headers: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["name", "value"],
+                        properties: {
+                          name: { type: "string", example: "x-api-key" },
+                          value: { type: "string", example: "secret123" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Auth config saved",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      config: { type: "object" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token or invalid header list" },
+            500: { description: "Failed to process webhook authorization settings" }
+          }
+        },
+        delete: {
+          tags: ["Webhook Capture"],
+          summary: "Clear the authorization requirement for a webhook token",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Auth config cleared",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      config: { type: "object" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process webhook authorization settings" }
+          }
+        }
+      },
+      "/api/webhook/{token}/blocked": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "List blocked (unauthorized) webhook attempts",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Blocked attempts",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string" },
+                      blocked: { type: "array", items: { type: "object" } }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process blocked webhook attempts" }
+          }
+        },
+        delete: {
+          tags: ["Webhook Capture"],
+          summary: "Clear blocked (unauthorized) webhook attempts",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Blocked attempts cleared",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      deleted: { type: "number", example: 2 }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process blocked webhook attempts" }
+          }
+        }
+      },
+      "/api/webhook/{token}/download": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Download all captured request bodies as a zip",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Zip archive stream",
+              content: { "application/zip": { schema: { type: "string", format: "binary" } } }
+            },
+            400: { description: "Invalid webhook token" },
+            404: { description: "No captured request bodies to download" },
+            500: { description: "Failed to build zip download" }
+          }
+        }
+      },
+      "/api/webhook/{token}/{requestId}/body": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Download a single captured request body",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } },
+            { name: "requestId", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Raw captured body, with Content-Type matching the original request",
+              content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } }
+            },
+            400: { description: "Invalid token or request id" },
+            404: { description: "Request not found or captured body file no longer available" },
+            500: { description: "Failed to read captured body" }
+          }
+        }
       }
     }
   };
