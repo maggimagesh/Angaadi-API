@@ -659,12 +659,24 @@ export function collectSenderInfo(req: NextApiRequest): WebhookSenderInfo {
 
 const REVERSE_DNS_TIMEOUT_MS = 2000
 
-function scheduleReverseDnsLookup(sender: WebhookSenderInfo): void {
-  const target = sender.ip || sender.remoteAddress
-  if (!target) {
-    sender.reverseDns = []
-    return
-  }
+// dns.reverse() runs on libuv's threadpool (default 4 threads, shared with fs
+// ops), and the JS-side timeout below only stops *waiting* on it — the
+// underlying OS call keeps the thread pinned until it actually returns. Under
+// a burst of concurrent webhook callbacks, unbounded reverse lookups can
+// starve the threadpool and stall response writes on every route (including
+// unrelated fs reads), which shows up client-side as timeouts / broken pipes.
+// Cap how many of our own lookups run at once and drop enrichment (rather
+// than queue it unboundedly) once the backlog gets too deep — this is
+// best-effort metadata for the inspector UI, not required to capture the
+// callback.
+const MAX_CONCURRENT_REVERSE_DNS_LOOKUPS = readPositiveIntEnv('WEBHOOK_MAX_CONCURRENT_REVERSE_DNS', 4)
+const MAX_QUEUED_REVERSE_DNS_LOOKUPS = readPositiveIntEnv('WEBHOOK_MAX_QUEUED_REVERSE_DNS', 50)
+
+let activeReverseDnsLookups = 0
+const reverseDnsQueue: Array<() => void> = []
+
+function runReverseDnsLookup(sender: WebhookSenderInfo, target: string): void {
+  activeReverseDnsLookups += 1
 
   void (async () => {
     let timer: NodeJS.Timeout | undefined
@@ -683,8 +695,33 @@ function scheduleReverseDnsLookup(sender: WebhookSenderInfo): void {
       if (timer) {
         clearTimeout(timer)
       }
+      activeReverseDnsLookups -= 1
+      const next = reverseDnsQueue.shift()
+      if (next) {
+        next()
+      }
     }
   })()
+}
+
+function scheduleReverseDnsLookup(sender: WebhookSenderInfo): void {
+  const target = sender.ip || sender.remoteAddress
+  if (!target) {
+    sender.reverseDns = []
+    return
+  }
+
+  if (activeReverseDnsLookups < MAX_CONCURRENT_REVERSE_DNS_LOOKUPS) {
+    runReverseDnsLookup(sender, target)
+    return
+  }
+
+  if (reverseDnsQueue.length >= MAX_QUEUED_REVERSE_DNS_LOOKUPS) {
+    sender.reverseDns = []
+    return
+  }
+
+  reverseDnsQueue.push(() => runReverseDnsLookup(sender, target))
 }
 
 export function getStorageRoot(): string {

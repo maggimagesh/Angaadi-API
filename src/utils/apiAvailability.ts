@@ -24,6 +24,14 @@ type RouteAvailabilityResult =
 const TOGGLE_FILE_PATH = path.join(process.cwd(), 'data', 'api-route-toggles.json')
 const EXEMPT_ROUTES = new Set(['/api/v1/system/toggle-route'])
 
+// Every incoming request (including webhook callbacks) calls readRouteToggleState()
+// via enforceRouteAvailability(). Without a cache, that's an fs.readFile() per
+// request, and fs ops share Node's small libuv threadpool with dns.reverse() —
+// under concurrent load the two compete and stall response writes. Cache briefly
+// and update the cache in-process on writes so toggles still take effect fast.
+const ROUTE_TOGGLE_CACHE_TTL_MS = 2000
+let routeToggleCache: { state: RouteToggleState; loadedAt: number } | null = null
+
 function normalizeRoutePath(route: string): string {
   const trimmedRoute = route.trim()
 
@@ -68,26 +76,36 @@ function normalizeState(state: Partial<RouteToggleState> | null | undefined): Ro
 }
 
 async function readRouteToggleState(): Promise<RouteToggleState> {
+  if (routeToggleCache && Date.now() - routeToggleCache.loadedAt < ROUTE_TOGGLE_CACHE_TTL_MS) {
+    return routeToggleCache.state
+  }
+
   try {
     const rawState = await fs.readFile(TOGGLE_FILE_PATH, 'utf8')
-    return normalizeState(JSON.parse(rawState))
+    const state = normalizeState(JSON.parse(rawState))
+    routeToggleCache = { state, loadedAt: Date.now() }
+    return state
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      return normalizeState(undefined)
+      const state = normalizeState(undefined)
+      routeToggleCache = { state, loadedAt: Date.now() }
+      return state
     }
 
     console.error('Failed to read API route toggle state:', error)
-    return normalizeState(undefined)
+    return routeToggleCache?.state ?? normalizeState(undefined)
   }
 }
 
 async function writeRouteToggleState(state: RouteToggleState): Promise<void> {
+  const normalized = normalizeState(state)
   await fs.mkdir(path.dirname(TOGGLE_FILE_PATH), { recursive: true })
   await fs.writeFile(
     TOGGLE_FILE_PATH,
-    `${JSON.stringify(normalizeState(state), null, 2)}\n`,
+    `${JSON.stringify(normalized, null, 2)}\n`,
     'utf8'
   )
+  routeToggleCache = { state: normalized, loadedAt: Date.now() }
 }
 
 export async function listDisabledRoutes(): Promise<RouteToggleState> {

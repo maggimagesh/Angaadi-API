@@ -25,6 +25,10 @@ primary_region = "bom"
   # Retain at most 500 callbacks per token. At 1 GiB each that bounds disk use
   # per token to ~5 GiB. Raise it only if you also raise the volume size.
   WEBHOOK_MAX_RECORDS_PER_TOKEN = "5000"
+  # Node's libuv threadpool (fs ops, dns.reverse) defaults to 4 threads.
+  # Under concurrent webhook bursts that starves file reads/writes and stalls
+  # response writes. Raise it well above expected concurrent connections.
+  UV_THREADPOOL_SIZE = "128"
 
 # Persistent volume for disk-spilled webhook bodies. Survives machine restarts
 # and is what stops a 1 GiB upload from blowing through /tmp.
@@ -42,7 +46,22 @@ primary_region = "bom"
   min_machines_running = 1
   processes = ["app"]
 
+  # Without this block Fly's proxy applies its own default per-machine
+  # connection limits, which is what was silently throttling/queuing load-test
+  # traffic before it ever reached Node. Sized with headroom above the
+  # 500-parallel-callback target.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 800
+    hard_limit = 1000
+
 [[vm]]
   cpu_kind = "shared"
+  # Left at 1 cpu / 1024 MB: webhook capture is I/O-bound (small JSON in,
+  # small JSON out; TLS is terminated at Fly's edge, not here), and the
+  # UV_THREADPOOL_SIZE bump above already removes the actual bottleneck.
+  # Only raise this (`fly scale vm shared-cpu-2x`) if a real load test shows
+  # CPU or memory actually saturating in `fly status` / `fly logs` — that's
+  # the only reason to pay for more here.
   cpus = 1
   memory_mb = 1024
