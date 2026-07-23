@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { promises as dns } from 'dns'
-import { createWriteStream, promises as fsp, type WriteStream } from 'fs'
+import { createWriteStream, promises as fsp, type Dirent, type WriteStream } from 'fs'
 import path from 'path'
 import type { IncomingHttpHeaders } from 'http'
 import type { ParsedUrlQuery } from 'querystring'
@@ -33,6 +33,16 @@ const INLINE_BODY_THRESHOLD = readPositiveIntEnv('WEBHOOK_INLINE_BODY_BYTES', 25
 const MAX_WEBHOOK_RECORDS_PER_TOKEN = readPositiveIntEnv('WEBHOOK_MAX_RECORDS_PER_TOKEN', 100)
 const BODY_PREVIEW_BYTES = 4096
 const PREVIEW_TEXT_CHARS = 2000
+
+// This is a debugging tool, not storage: captured requests (and the disk
+// space their bodies use) are deleted this many hours after receipt by a
+// periodic sweep (see pruneExpiredWebhookRecords / instrumentation-node.ts).
+const WEBHOOK_RETENTION_HOURS = readPositiveIntEnv('WEBHOOK_RETENTION_HOURS', 48)
+const WEBHOOK_RETENTION_MS = WEBHOOK_RETENTION_HOURS * 60 * 60 * 1000
+
+export function getWebhookRetentionHours(): number {
+  return WEBHOOK_RETENTION_HOURS
+}
 
 interface InternalRecord extends WebhookCaptureRecord {
   bodyFilePath?: string
@@ -728,6 +738,38 @@ export function getStorageRoot(): string {
   return process.env.WEBHOOK_BODY_DIR || path.join(process.cwd(), 'data', 'webhook_inbox')
 }
 
+// Capture records (and the disk-spill paths they point at) live only in
+// global.webhookCaptureStore, which is always empty right after boot. Any
+// per-token directory already on disk at startup therefore belonged to a
+// process that no longer exists — nothing can ever reference it again, so it
+// is pure leaked disk. Without this sweep those directories accumulate across
+// every redeploy until the volume hits ENOSPC, which surfaces to senders as a
+// broken pipe mid-upload. `_auth` is excluded: it holds durable per-token auth
+// config (persisted by design) rather than ephemeral capture data.
+export async function cleanupOrphanedWebhookBodies(): Promise<void> {
+  const root = getStorageRoot()
+  let entries: Dirent<string>[]
+
+  try {
+    entries = await fsp.readdir(root, { withFileTypes: true })
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return
+    }
+    throw err
+  }
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name !== '_auth')
+      .map((entry) =>
+        fsp.rm(path.join(root, entry.name), { recursive: true, force: true }).catch(() => {
+          /* best-effort */
+        })
+      )
+  )
+}
+
 async function ensureTokenDir(token: string): Promise<string> {
   const dir = path.join(getStorageRoot(), token)
   await fsp.mkdir(dir, { recursive: true })
@@ -872,6 +914,48 @@ async function persistWebhookRecord(token: string, record: InternalRecord): Prom
   }
 }
 
+// Called on a timer (see instrumentation-node.ts) so retention is enforced
+// continuously on a long-lived process, not just at boot. Deletes both the
+// in-memory record and its disk-spilled body once it's older than
+// WEBHOOK_RETENTION_HOURS.
+export async function pruneExpiredWebhookRecords(): Promise<void> {
+  const store = getWebhookCaptureStore()
+  const cutoff = Date.now() - WEBHOOK_RETENTION_MS
+
+  for (const [token, records] of store) {
+    const kept: InternalRecord[] = []
+    const expired: InternalRecord[] = []
+
+    for (const record of records) {
+      if (new Date(record.receivedAt).getTime() < cutoff) {
+        expired.push(record)
+      } else {
+        kept.push(record)
+      }
+    }
+
+    if (expired.length === 0) {
+      continue
+    }
+
+    if (kept.length === 0) {
+      store.delete(token)
+    } else {
+      store.set(token, kept)
+    }
+
+    for (const record of expired) {
+      if (record.bodyFilePath) {
+        try {
+          await fsp.unlink(record.bodyFilePath)
+        } catch {
+          /* ignore missing files */
+        }
+      }
+    }
+  }
+}
+
 function publicRecord(record: InternalRecord, slimBody = false): WebhookCaptureRecord {
   const { bodyFilePath: _unused, ...rest } = record
   void _unused
@@ -997,6 +1081,7 @@ export async function listStoredWebhookRequests(
     captureUrl,
     inspectUrl,
     requests,
+    retentionHours: WEBHOOK_RETENTION_HOURS,
   }
 }
 

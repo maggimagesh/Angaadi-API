@@ -7,7 +7,7 @@ import type {
   WebhookAuthHeader,
   WebhookBlockedRecord,
 } from '@/types/webhook'
-import { collectSenderInfo, getStorageRoot } from '@/utils/webhookInbox'
+import { collectSenderInfo, getStorageRoot, getWebhookRetentionHours } from '@/utils/webhookInbox'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
 const MAX_AUTH_HEADERS = 10
@@ -313,4 +313,21 @@ export function clearBlockedAttempts(token: string): number {
   const count = (store.get(safeToken) || []).length
   store.delete(safeToken)
   return count
+}
+
+// Same retention window as captured requests (see pruneExpiredWebhookRecords)
+// — blocked-attempt logs have no disk footprint, but should age out on the
+// same schedule so the inbox doesn't show unauthorized attempts from weeks ago.
+export function pruneExpiredBlockedAttempts(): void {
+  const store = getBlockedStore()
+  const cutoff = Date.now() - getWebhookRetentionHours() * 60 * 60 * 1000
+
+  for (const [token, records] of store) {
+    const kept = records.filter((record) => new Date(record.receivedAt).getTime() >= cutoff)
+    if (kept.length === 0) {
+      store.delete(token)
+    } else if (kept.length !== records.length) {
+      store.set(token, kept)
+    }
+  }
 }

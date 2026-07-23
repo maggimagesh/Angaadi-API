@@ -25,6 +25,10 @@ primary_region = "bom"
   # Retain at most 500 callbacks per token. At 1 GiB each that bounds disk use
   # per token to ~5 GiB. Raise it only if you also raise the volume size.
   WEBHOOK_MAX_RECORDS_PER_TOKEN = "5000"
+  # This is a debugging tool, not storage: captured requests (and their
+  # disk-spilled bodies) are permanently deleted this many hours after
+  # receipt by a periodic in-process sweep. Shown to users in the inspector UI.
+  WEBHOOK_RETENTION_HOURS = "48"
   # Node's libuv threadpool (fs ops, dns.reverse) defaults to 4 threads.
   # Under concurrent webhook bursts that starves file reads/writes and stalls
   # response writes. Raise it well above expected concurrent connections.

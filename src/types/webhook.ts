@@ -98,6 +98,7 @@ export interface WebhookCaptureListResponse {
   requests: WebhookCaptureRecord[]
   authEnabled?: boolean
   blocked?: WebhookBlockedRecord[]
+  retentionHours?: number
 }
 
 export interface WebhookAuthHeader {
