@@ -57,7 +57,7 @@ export class OrderService {
         tax,
         total,
         deliverySlot: input.deliverySlot,
-        paymentMethod: input.paymentMethod || 'paypal',
+        paymentMethod: input.paymentMethod || 'razorpay',
         paymentStatus: 'pending',
         items: {
           create: cart.items.map((item) => ({
@@ -105,20 +105,20 @@ export class OrderService {
     return order
   }
 
-  async markAwaitingPayment(orderId: bigint, paypalOrderId: string) {
+  async markAwaitingPayment(orderId: bigint, gatewayOrderId: string) {
     return prisma.orders.update({
       where: { id: orderId },
-      data: { paypalOrderId, paymentStatus: 'pending', updated_at: new Date() },
+      data: { gatewayOrderId, paymentStatus: 'pending', updated_at: new Date() },
     })
   }
 
-  async markPaid(orderId: bigint, paypalCaptureId: string) {
+  async markPaid(orderId: bigint, gatewayPaymentId: string) {
     const order = await prisma.orders.update({
       where: { id: orderId },
       data: {
         status: 'paid',
         paymentStatus: 'completed',
-        paypalCaptureId,
+        gatewayPaymentId,
         updated_at: new Date(),
       },
       include: ORDER_INCLUDE,

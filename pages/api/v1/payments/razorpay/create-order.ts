@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '@/middleware/auth'
 import { serializeBigInt } from '@/utils/serialize'
 import { OrderService } from '@/services/orderService'
-import { PaypalService } from '@/services/paypalService'
+import { RazorpayService } from '@/services/razorpayService'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -10,13 +10,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const user = (req as any).user as { sub: string }
-  const { orderId } = req.body || {}
+  const { orderId, demo } = req.body || {}
   if (typeof orderId !== 'string' && typeof orderId !== 'number') {
     return res.status(400).json({ error: 'orderId is required' })
   }
 
   const orderService = new OrderService()
-  const paypalService = new PaypalService()
+  const razorpayService = new RazorpayService()
 
   try {
     const order = await orderService.getOrder(user.sub, String(orderId))
@@ -24,10 +24,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(409).json({ error: `Order is ${order.status}, not awaiting payment` })
     }
 
-    const { paypalOrderId, demo } = await paypalService.createOrder(Number(order.total))
-    await orderService.markAwaitingPayment(order.id, paypalOrderId)
+    const created = await razorpayService.createOrder(
+      Number(order.total),
+      order.orderNumber,
+      demo === true
+    )
+    await orderService.markAwaitingPayment(order.id, created.razorpayOrderId)
 
-    return res.status(200).json(serializeBigInt({ paypalOrderId, demo, orderNumber: order.orderNumber }))
+    return res.status(200).json(
+      serializeBigInt({
+        razorpayOrderId: created.razorpayOrderId,
+        amount: created.amount,
+        currency: created.currency,
+        keyId: created.keyId,
+        demo: created.demo,
+        orderNumber: order.orderNumber,
+      })
+    )
   } catch (error: any) {
     const message = error?.message || 'Internal server error'
     const code = message === 'Order not found' ? 404 : message.includes('awaiting payment') ? 409 : 500

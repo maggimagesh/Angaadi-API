@@ -639,8 +639,10 @@ model orders {
   deliverySlot    String?      @db.VarChar(100)
   paymentMethod   String       @default("paypal") @db.VarChar(30)
   paymentStatus   String       @default("pending") @db.VarChar(20)
-  paypalOrderId   String?      @db.VarChar(64)
-  paypalCaptureId String?      @db.VarChar(64)
+  // Gateway-neutral names; @map keeps the original DB columns so no migration
+  // is needed after the PayPal -> Razorpay switch.
+  gatewayOrderId   String?     @map("paypalOrderId") @db.VarChar(64)
+  gatewayPaymentId String?     @map("paypalCaptureId") @db.VarChar(64)
   created_at      DateTime     @default(now()) @db.Timestamptz(6)
   updated_at      DateTime?    @db.Timestamptz(6)
   userDetails     userDetails  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)

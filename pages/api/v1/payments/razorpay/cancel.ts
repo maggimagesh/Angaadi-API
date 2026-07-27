@@ -3,7 +3,7 @@ import { withAuth } from '@/middleware/auth'
 import { serializeBigInt } from '@/utils/serialize'
 import { OrderService } from '@/services/orderService'
 
-/** Hit when the buyer cancels or the PayPal popup errors before capture. */
+/** Hit when the buyer dismisses the Razorpay modal or it errors before verification. */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
