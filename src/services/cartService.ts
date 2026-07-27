@@ -44,6 +44,11 @@ export class CartService {
     return this.getCart(userIdStr)
   }
 
+  async clearCart(userIdStr: string) {
+    const userId = this.toBigInt(userIdStr)
+    await prisma.cart.deleteMany({ where: { userId } })
+  }
+
   async deleteCartItem(userIdStr: string, productId: number) {
     const userId = this.toBigInt(userIdStr)
 

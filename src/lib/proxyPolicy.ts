@@ -45,6 +45,13 @@ export const ALLOWED_ROUTES: AllowedRoute[] = [
   route(/^\/users\/reset-password$/, ['POST']),
   route(/^\/users\/physical-stats$/, ['GET', 'POST', 'PUT', 'DELETE']),
   route(new RegExp(`^/users/${ID}$`), ['GET']),
+  route(/^\/addresses$/, ['GET', 'POST']),
+  route(new RegExp(`^/addresses/${ID}$`), ['GET', 'PUT', 'PATCH', 'DELETE']),
+  route(/^\/orders$/, ['GET', 'POST']),
+  route(new RegExp(`^/orders/${ID}$`), ['GET']),
+  route(/^\/payments\/paypal\/create-order$/, ['POST']),
+  route(/^\/payments\/paypal\/capture-order$/, ['POST']),
+  route(/^\/payments\/paypal\/cancel$/, ['POST']),
 ]
 
 const SAFE_QUERY = /^[A-Za-z0-9._~%=&+-]*$/
