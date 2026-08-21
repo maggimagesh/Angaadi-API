@@ -272,7 +272,7 @@ function buildDiskStoredBody(args: {
   if (probablyText) {
     const sample = headSample.toString('utf8')
     const trimmed = sample.length > PREVIEW_TEXT_CHARS ? sample.slice(0, PREVIEW_TEXT_CHARS) : sample
-    const preview = `${trimmed}\n\n… body truncated for inline view — ${sizeBytes.toLocaleString()} bytes total. Use the Download button to fetch the full payload.`
+    const preview = `${trimmed}\n\n… preview only — ${sizeBytes.toLocaleString()} bytes total. Use "Load full payload" in the inspector to stream all of it, or "Download raw" to save it.`
 
     return {
       format: 'text',
@@ -296,7 +296,7 @@ function buildDiskStoredBody(args: {
     text: null,
     json: null,
     base64: null,
-    preview: `[binary payload, ${sizeBytes.toLocaleString()} bytes — use the Download button to fetch]`,
+    preview: `[binary payload, ${sizeBytes.toLocaleString()} bytes — use "Load full payload" or "Download raw" in the inspector]`,
     truncated: true,
     downloadUrl,
   }

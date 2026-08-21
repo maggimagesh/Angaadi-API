@@ -1,7 +1,8 @@
 import Head from 'next/head'
 import type { GetServerSidePropsContext, InferGetServerSidePropsType } from 'next'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IncomingMessage } from 'http'
+import WebhookBodyViewer from '@/components/WebhookBodyViewer'
 import type { WebhookCaptureListResponse, WebhookCaptureRecord } from '@/types/webhook'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
@@ -50,18 +51,6 @@ function renderStructuredValue(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
-function getBodyText(record: WebhookCaptureRecord): string {
-  if (record.body.format === 'json') {
-    return renderStructuredValue(record.body.json)
-  }
-
-  if (record.body.format === 'binary') {
-    return record.body.base64 || 'Binary body missing'
-  }
-
-  return record.body.text || 'No request body'
-}
-
 function getResponseText(record: WebhookCaptureRecord): string {
   if (record.response.text) {
     return record.response.text
@@ -105,6 +94,14 @@ export default function WebhookInspectorPage({
   const [error, setError] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
+
+  // A 100 MB+ body is pulled over many slices; re-polling the inbox in the
+  // middle of that competes for the browser's connections to the same origin
+  // and slows the transfer down, so the poll pauses while one is running.
+  const bodyLoadingRef = useRef(false)
+  const handleBodyLoadingChange = useCallback((isLoading: boolean) => {
+    bodyLoadingRef.current = isLoading
+  }, [])
 
   const selectedRequest =
     payload.requests.find((request) => request.id === selectedRequestId) || payload.requests[0] || null
@@ -151,6 +148,9 @@ export default function WebhookInspectorPage({
     void loadRequests(true)
 
     const intervalId = window.setInterval(() => {
+      if (bodyLoadingRef.current) {
+        return
+      }
       void loadRequests(false)
     }, 2500)
 
@@ -327,7 +327,12 @@ export default function WebhookInspectorPage({
                     <h2>Body</h2>
                     <span>{selectedRequest.body.contentType || selectedRequest.body.format}</span>
                   </div>
-                  <pre>{getBodyText(selectedRequest)}</pre>
+                  <WebhookBodyViewer
+                    key={selectedRequest.id}
+                    token={token}
+                    request={selectedRequest}
+                    onLoadingChange={handleBodyLoadingChange}
+                  />
                 </article>
 
                 <article className="detail-card">
