@@ -31,6 +31,16 @@ function getRouteString(value: string | string[] | undefined): string | null {
   return Array.isArray(value) ? value[0] || null : null
 }
 
+// The body URL doubles as the "view it" URL and the "save it" URL, so the
+// attachment disposition is opt-in via `?download=1`. Accept the obvious
+// truthy spellings too: getting this flag wrong silently downgrades a download
+// into the browser rendering the payload in the tab.
+function isAttachmentRequested(value: string | string[] | undefined): boolean {
+  const flag = getRouteString(value)
+  if (flag === null) return false
+  return ['1', 'true', 'yes'].includes(flag.trim().toLowerCase())
+}
+
 function extensionForContentType(contentType: string | null): string {
   if (!contentType) return 'bin'
   if (contentType.includes('json')) return 'json'
@@ -233,7 +243,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Type', contentType)
     res.setHeader(
       'Content-Disposition',
-      `${getRouteString(req.query.download) === '1' ? 'attachment' : 'inline'}; filename="${filename}"`
+      `${isAttachmentRequested(req.query.download) ? 'attachment' : 'inline'}; filename="${filename}"`
     )
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('Accept-Ranges', 'bytes')
