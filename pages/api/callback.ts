@@ -5,12 +5,21 @@ import crypto from 'crypto';
 import { pipeline } from 'stream/promises';
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 
-const BASE_OUTPUT_DIR = path.join(process.cwd(), 'data', 'callback_OP');
-const TEMP_DIR = path.join(process.cwd(), 'data', 'temp');
+// On Fly the only writable, persistent path is the mounted volume at /data
+// (the container runs as non-root `nextjs`, so process.cwd() -> /app is
+// read-only). Default to it in production; use ./data for local `next dev`.
+const DATA_ROOT =
+    process.env.CALLBACK_DATA_DIR ||
+    (process.env.NODE_ENV === 'production' ? '/data' : path.join(process.cwd(), 'data'));
+const BASE_OUTPUT_DIR = path.join(DATA_ROOT, 'callback_OP');
+const TEMP_DIR = path.join(DATA_ROOT, 'temp');
 
-// Ensure directories exist
-if (!fs.existsSync(BASE_OUTPUT_DIR)) fs.mkdirSync(BASE_OUTPUT_DIR, { recursive: true });
-if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+// Create lazily inside the handler, not at module load: a throw here takes the
+// whole route down with a 500 on every request.
+function ensureDirs() {
+    fs.mkdirSync(BASE_OUTPUT_DIR, { recursive: true });
+    fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
 
 export const config = {
     api: {
@@ -26,8 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
         const tempFilePath = path.join(TEMP_DIR, `temp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.json`);
-        
+
         try {
+            ensureDirs();
             // 1. Stream the raw request body directly to a temporary file
             const writeStream = fs.createWriteStream(tempFilePath);
             await pipeline(req, writeStream);
