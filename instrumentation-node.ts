@@ -1,4 +1,5 @@
 import { pruneExpiredBlockedAttempts } from './src/utils/webhookAuth'
+import { pruneByDiskUsage } from './src/utils/diskGuard'
 import {
   cleanupOrphanedWebhookBodies,
   getWebhookRetentionHours,
@@ -11,6 +12,7 @@ async function sweepExpiredWebhookData(): Promise<void> {
   try {
     await pruneExpiredWebhookRecords()
     pruneExpiredBlockedAttempts()
+    await pruneByDiskUsage()
   } catch (err) {
     console.error('Webhook retention sweep failed:', err)
   }

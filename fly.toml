@@ -31,6 +31,12 @@ primary_region = "bom"
   # disk-spilled bodies) are permanently deleted this many hours after
   # receipt by a periodic in-process sweep. Shown to users in the inspector UI.
   WEBHOOK_RETENTION_HOURS = "48"
+  # Disk-pressure backstop (src/utils/diskGuard.ts). The same 15-min sweep
+  # checks /data usage; once it crosses HIGH_WATER it deletes oldest files
+  # first (across callback_OP + webhook_inbox, never _auth configs) until back
+  # under LOW_WATER. Values are fractions of the 5 GiB volume.
+  DISK_GUARD_HIGH_WATER = "0.95"
+  DISK_GUARD_LOW_WATER = "0.80"
   # Node's libuv threadpool (fs ops, dns.reverse) defaults to 4 threads.
   # Under concurrent webhook bursts that starves file reads/writes and stalls
   # response writes. Raise it well above expected concurrent connections.
