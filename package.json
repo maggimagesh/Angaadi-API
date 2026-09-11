@@ -8,7 +8,13 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test \"tests/**/*.test.ts\"",
+    "test:unit": "node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test \"tests/unit/*.test.ts\"",
+    "test:regression": "node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test \"tests/regression/*.test.ts\"",
+    "test:security": "node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test \"tests/security/*.test.ts\"",
+    "test:smoke": "node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test \"tests/smoke/*.test.ts\"",
+    "typecheck": "tsc --noEmit && tsc -p tests/tsconfig.json"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

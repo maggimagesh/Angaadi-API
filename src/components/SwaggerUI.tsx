@@ -2009,7 +2009,7 @@ export default function SwaggerUIComponent() {
               }
             },
             400: { description: "Invalid webhook token" },
-            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            401: { description: "Unauthorized - this webhook requires authorization headers and/or query params that were missing or invalid" },
             413: { description: "Webhook body exceeds maximum allowed size" },
             500: { description: "Failed to capture webhook request" }
           }
@@ -2034,7 +2034,7 @@ export default function SwaggerUIComponent() {
           responses: {
             200: { description: "Request captured (same shape as GET on this path)" },
             400: { description: "Invalid webhook token" },
-            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            401: { description: "Unauthorized - this webhook requires authorization headers and/or query params that were missing or invalid" },
             413: { description: "Webhook body exceeds maximum allowed size" },
             500: { description: "Failed to capture webhook request" }
           }
@@ -2053,7 +2053,7 @@ export default function SwaggerUIComponent() {
           responses: {
             200: { description: "Request captured (same shape as GET on this path)" },
             400: { description: "Invalid webhook token" },
-            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            401: { description: "Unauthorized - this webhook requires authorization headers and/or query params that were missing or invalid" },
             413: { description: "Webhook body exceeds maximum allowed size" },
             500: { description: "Failed to capture webhook request" }
           }
@@ -2072,7 +2072,7 @@ export default function SwaggerUIComponent() {
           responses: {
             200: { description: "Request captured (same shape as GET on this path)" },
             400: { description: "Invalid webhook token" },
-            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            401: { description: "Unauthorized - this webhook requires authorization headers and/or query params that were missing or invalid" },
             413: { description: "Webhook body exceeds maximum allowed size" },
             500: { description: "Failed to capture webhook request" }
           }
@@ -2087,7 +2087,7 @@ export default function SwaggerUIComponent() {
           responses: {
             200: { description: "Request captured (same shape as GET on this path)" },
             400: { description: "Invalid webhook token" },
-            401: { description: "Unauthorized - this webhook requires authorization headers that were missing or invalid" },
+            401: { description: "Unauthorized - this webhook requires authorization headers and/or query params that were missing or invalid" },
             413: { description: "Webhook body exceeds maximum allowed size" },
             500: { description: "Failed to capture webhook request" }
           }
@@ -2211,6 +2211,17 @@ export default function SwaggerUIComponent() {
                               }
                             }
                           },
+                          queryEnabled: { type: "boolean" },
+                          queryParams: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                name: { type: "string", example: "callback_key" },
+                                value: { type: "string", example: "secret123" }
+                              }
+                            }
+                          },
                           updatedAt: { type: "string", nullable: true }
                         }
                       }
@@ -2225,8 +2236,8 @@ export default function SwaggerUIComponent() {
         },
         put: {
           tags: ["Webhook Capture"],
-          summary: "Require specific headers on inbound webhook requests",
-          description: "Configures required-header authorization for this webhook token. Requests missing/mismatching a required header are rejected with 401 and recorded as blocked attempts.",
+          summary: "Require specific headers and/or query params on inbound webhook requests",
+          description: "Configures authorization for this webhook token. `enabled`/`headers` gate the required-header check and `queryEnabled`/`queryParams` gate the required-query-param check; the two are independent and can be on together, separately, or not at all. When both are on, a caller must satisfy both. Requests missing/mismatching a requirement are rejected with 401 and recorded as blocked attempts. `queryEnabled` and `queryParams` are optional and default to off, so header-only clients keep working unchanged.",
           parameters: [
             { name: "token", in: "path", required: true, schema: { type: "string" } }
           ],
@@ -2238,14 +2249,29 @@ export default function SwaggerUIComponent() {
                   type: "object",
                   required: ["enabled", "headers"],
                   properties: {
-                    enabled: { type: "boolean", example: true },
+                    enabled: { type: "boolean", example: true, description: "Turn the required-header check on or off." },
                     headers: {
                       type: "array",
+                      maxItems: 10,
                       items: {
                         type: "object",
                         required: ["name", "value"],
                         properties: {
                           name: { type: "string", example: "x-api-key" },
+                          value: { type: "string", example: "secret123" }
+                        }
+                      }
+                    },
+                    queryEnabled: { type: "boolean", example: true, description: "Turn the required-query-param check on or off." },
+                    queryParams: {
+                      type: "array",
+                      maxItems: 10,
+                      description: "Query params every callback must carry, e.g. /hook/{token}?callback_key=secret123. Names are case-sensitive and limited to letters, digits and _ . ~ - ; \"token\" and \"path\" are reserved. A required param repeated in one request is rejected.",
+                      items: {
+                        type: "object",
+                        required: ["name", "value"],
+                        properties: {
+                          name: { type: "string", example: "callback_key" },
                           value: { type: "string", example: "secret123" }
                         }
                       }
@@ -2271,13 +2297,14 @@ export default function SwaggerUIComponent() {
                 }
               }
             },
-            400: { description: "Invalid webhook token or invalid header list" },
+            400: { description: "Invalid webhook token, or an invalid header/query param list" },
             500: { description: "Failed to process webhook authorization settings" }
           }
         },
         delete: {
           tags: ["Webhook Capture"],
-          summary: "Clear the authorization requirement for a webhook token",
+          summary: "Clear every authorization requirement for a webhook token",
+          description: "Removes both the header and the query param requirements.",
           parameters: [
             { name: "token", in: "path", required: true, schema: { type: "string" } }
           ],
@@ -2299,6 +2326,129 @@ export default function SwaggerUIComponent() {
             },
             400: { description: "Invalid webhook token" },
             500: { description: "Failed to process webhook authorization settings" }
+          }
+        }
+      },
+      "/api/webhook/{token}/auth-query": {
+        get: {
+          tags: ["Webhook Capture"],
+          summary: "Get the query param authorization requirement for a webhook token",
+          description: "Returns only the query param half of the auth config. Use /api/webhook/{token}/auth to see headers and query params together.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Current query param auth config",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string" },
+                      config: {
+                        type: "object",
+                        properties: {
+                          queryEnabled: { type: "boolean" },
+                          queryParams: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                name: { type: "string", example: "callback_key" },
+                                value: { type: "string", example: "secret123" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process webhook query param authorization settings" }
+          }
+        },
+        put: {
+          tags: ["Webhook Capture"],
+          summary: "Require specific query params on inbound webhook requests",
+          description: "Sets the query param requirement on its own — any configured headers are left untouched. Senders then have to call /hook/{token}?<name>=<value>; a request missing a required param, sending a wrong value, or repeating a required param is rejected with 401 and recorded as a blocked attempt (with the secret values redacted from the logged URL). Names are case-sensitive and limited to letters, digits and _ . ~ - ; \"token\" and \"path\" are reserved because they are route parameters of the capture URL.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["queryParams"],
+                  properties: {
+                    queryEnabled: { type: "boolean", example: true, description: "Turn the check on or off. `enabled` is accepted as an alias." },
+                    queryParams: {
+                      type: "array",
+                      maxItems: 10,
+                      items: {
+                        type: "object",
+                        required: ["name", "value"],
+                        properties: {
+                          name: { type: "string", example: "callback_key" },
+                          value: { type: "string", example: "secret123" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            200: {
+              description: "Query param auth config saved",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      config: { type: "object", description: "The full auth config after the merge, headers included." }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token or invalid query param list" },
+            500: { description: "Failed to process webhook query param authorization settings" }
+          }
+        },
+        delete: {
+          tags: ["Webhook Capture"],
+          summary: "Clear the query param authorization requirement for a webhook token",
+          description: "Turns the query param check off and drops the params. Configured headers are left in place.",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } }
+          ],
+          responses: {
+            200: {
+              description: "Query param auth config cleared",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      token: { type: "string" },
+                      config: { type: "object" }
+                    }
+                  }
+                }
+              }
+            },
+            400: { description: "Invalid webhook token" },
+            500: { description: "Failed to process webhook query param authorization settings" }
           }
         }
       },

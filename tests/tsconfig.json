@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Node's type stripping resolves relative imports literally, so test files
+    // import helpers with an explicit ".ts" extension. That is only legal for
+    // the compiler with this flag, which is why the tests typecheck under their
+    // own config instead of the app's.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

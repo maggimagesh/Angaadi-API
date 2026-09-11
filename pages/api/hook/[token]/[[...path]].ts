@@ -53,9 +53,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const authResult = checkWebhookAuth(req, authConfig)
 
   if (!authResult.ok) {
-    recordBlockedAttempt(req, token, getRoutePath(req.query.path), authResult)
+    recordBlockedAttempt(req, token, getRoutePath(req.query.path), authResult, authConfig)
+    // Deliberately generic: the response never says which header or query param
+    // was wrong, so a caller cannot probe the rules one field at a time.
     res.status(401).json({
-      error: 'Unauthorized: this webhook requires authorization headers that were missing or invalid',
+      error:
+        'Unauthorized: this webhook requires authorization credentials that were missing or invalid',
     })
     return
   }
