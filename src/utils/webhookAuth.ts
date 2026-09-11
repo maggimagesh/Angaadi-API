@@ -459,6 +459,34 @@ export function collectRequestQueryParams(req: NextApiRequest): Map<string, stri
   return collected
 }
 
+// Builds the URL a sender must actually call once query-param auth is on, by
+// appending the configured params to a capture URL. Values are
+// percent-encoded, so a secret containing reserved characters still produces a
+// URL that can be handed over and used as-is.
+export function appendWebhookQueryAuthParams(
+  baseUrl: string,
+  queryParams: WebhookAuthQueryParam[]
+): string {
+  if (queryParams.length === 0) {
+    return baseUrl
+  }
+
+  const search = queryParams
+    .map((param) => `${encodeURIComponent(param.name)}=${encodeURIComponent(param.value)}`)
+    .join('&')
+
+  return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${search}`
+}
+
+// The params are only worth appending once the requirement is switched on —
+// handing out a URL carrying secrets nothing checks would be misleading.
+export function buildAuthorizedCaptureUrl(baseUrl: string, config: WebhookAuthConfig): string {
+  return appendWebhookQueryAuthParams(
+    baseUrl,
+    config.queryEnabled ? config.queryParams : []
+  )
+}
+
 export type WebhookAuthCheckResult =
   | { ok: true }
   | {

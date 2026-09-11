@@ -3,7 +3,12 @@
 import assert from 'node:assert/strict'
 import test, { describe } from 'node:test'
 import type { WebhookAuthConfig } from '@/types/webhook'
-import { checkWebhookAuth, collectRequestQueryParams } from '@/utils/webhookAuth'
+import {
+  appendWebhookQueryAuthParams,
+  buildAuthorizedCaptureUrl,
+  checkWebhookAuth,
+  collectRequestQueryParams,
+} from '@/utils/webhookAuth'
 import { captureUrl, mockRequest } from '../helpers/mockRequest.ts'
 
 const TOKEN = 'abcdefghijkl'
@@ -250,5 +255,84 @@ describe('checkWebhookAuth — headers and query params together', () => {
       })
     )
     assert.deepEqual(result, { ok: true })
+  })
+})
+
+describe('appendWebhookQueryAuthParams', () => {
+  const BASE = `https://hooks.example.com/valid-webhooks/${TOKEN}`
+
+  test('returns the base URL untouched when nothing is configured', () => {
+    assert.equal(appendWebhookQueryAuthParams(BASE, []), BASE)
+  })
+
+  test('appends one param', () => {
+    assert.equal(
+      appendWebhookQueryAuthParams(BASE, [{ name: 'callback_key', value: 'secret' }]),
+      `${BASE}?callback_key=secret`
+    )
+  })
+
+  test('joins several params with &', () => {
+    assert.equal(
+      appendWebhookQueryAuthParams(BASE, [
+        { name: 'a', value: '1' },
+        { name: 'b', value: '2' },
+      ]),
+      `${BASE}?a=1&b=2`
+    )
+  })
+
+  test('uses & when the base URL already carries a query string', () => {
+    assert.equal(
+      appendWebhookQueryAuthParams(`${BASE}?existing=1`, [{ name: 'k', value: 'v' }]),
+      `${BASE}?existing=1&k=v`
+    )
+  })
+
+  test('percent-encodes a value so the URL is usable as-is', () => {
+    const secret = 'a b&c=d?e#f'
+    const url = appendWebhookQueryAuthParams(BASE, [{ name: 'k', value: secret }])
+    const parsed = new URL(url)
+
+    assert.equal(parsed.searchParams.get('k'), secret)
+    // A value that looks like extra params cannot become them.
+    assert.deepEqual([...parsed.searchParams.keys()], ['k'])
+    assert.equal(parsed.hash, '')
+  })
+
+  test('the URL it produces actually passes the check it describes', () => {
+    // The whole point: whatever this hands out must satisfy checkWebhookAuth.
+    const queryParams = [
+      { name: 'callback_key', value: 'a b&c=d' },
+      { name: 'tenant.id', value: 'acme~1' },
+    ]
+    const url = appendWebhookQueryAuthParams(`/api/hook/${TOKEN}`, queryParams)
+
+    assert.deepEqual(
+      checkWebhookAuth(mockRequest({ url }), config({ queryEnabled: true, queryParams })),
+      { ok: true }
+    )
+  })
+})
+
+describe('buildAuthorizedCaptureUrl', () => {
+  const BASE = `https://hooks.example.com/valid-webhooks/${TOKEN}`
+
+  test('appends the params when the requirement is on', () => {
+    const url = buildAuthorizedCaptureUrl(
+      BASE,
+      config({ queryEnabled: true, queryParams: [{ name: 'k', value: 'v' }] })
+    )
+    assert.equal(url, `${BASE}?k=v`)
+  })
+
+  test('omits them while the requirement is off', () => {
+    // Handing out a URL carrying secrets that nothing checks would be
+    // misleading, so an off switch means a bare URL.
+    const url = buildAuthorizedCaptureUrl(
+      BASE,
+      config({ queryEnabled: false, queryParams: [{ name: 'k', value: 'v' }] })
+    )
+    assert.equal(url, BASE)
   })
 })

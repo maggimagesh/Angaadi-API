@@ -66,6 +66,9 @@ function configOf(response: ReturnType<typeof mockResponse>): WebhookAuthConfig 
   return (response.jsonBody as { config: WebhookAuthConfig }).config
 }
 
+// /auth-query is scoped to the query half, so its `config` carries only
+// queryEnabled/queryParams; /auth returns the whole thing.
+
 describe('smoke: configuring query param auth through the API', () => {
   test('a fresh token starts with both switches off', async () => {
     const response = await call(authHandler, { method: 'GET' })
@@ -124,10 +127,36 @@ describe('smoke: configuring query param auth through the API', () => {
     })
 
     assert.equal(response.statusCode, 200)
-    const config = configOf(response)
-    assert.equal(config.enabled, true)
-    assert.deepEqual(config.headers, [{ name: 'X-Webhook-Key', value: 'header-secret' }])
-    assert.deepEqual(config.queryParams, [{ name: 'rotated_key', value: 'rotated-secret' }])
+    assert.deepEqual(configOf(response).queryParams, [
+      { name: 'rotated_key', value: 'rotated-secret' },
+    ])
+
+    // Read the whole config back rather than trusting the echo: this proves the
+    // header rule actually survived the write.
+    const full = configOf(await call(authHandler, { method: 'GET' }))
+    assert.equal(full.enabled, true)
+    assert.deepEqual(full.headers, [{ name: 'X-Webhook-Key', value: 'header-secret' }])
+    assert.deepEqual(full.queryParams, [{ name: 'rotated_key', value: 'rotated-secret' }])
+  })
+
+  test('PUT /auth-query returns a ready-to-send capture URL', async () => {
+    const response = await call(authQueryHandler, {
+      method: 'PUT',
+      url: `/api/webhook/${TOKEN}/auth-query`,
+      body: {
+        queryEnabled: true,
+        queryParams: [{ name: 'callback_key', value: 'needs escaping &=?' }],
+      },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const { captureUrl } = response.jsonBody as { captureUrl: string }
+
+    // The URL must be usable as-is: the secret round-trips through parsing, and
+    // its reserved characters cannot split into extra params.
+    const parsed = new URL(captureUrl)
+    assert.equal(parsed.searchParams.get('callback_key'), 'needs escaping &=?')
+    assert.deepEqual([...parsed.searchParams.keys()], ['callback_key'])
   })
 
   test('DELETE /auth-query clears the query rule and keeps the header rule', async () => {
@@ -140,7 +169,13 @@ describe('smoke: configuring query param auth through the API', () => {
     const config = configOf(response)
     assert.equal(config.queryEnabled, false)
     assert.deepEqual(config.queryParams, [])
-    assert.equal(config.enabled, true)
+
+    // With the rule off the capture URL carries no params again.
+    const { captureUrl } = response.jsonBody as { captureUrl: string }
+    assert.ok(!captureUrl.includes('?'), `expected a bare capture URL, got ${captureUrl}`)
+
+    const full = configOf(await call(authHandler, { method: 'GET' }))
+    assert.equal(full.enabled, true)
   })
 
   test('an invalid query param is rejected with 400 and a usable message', async () => {
