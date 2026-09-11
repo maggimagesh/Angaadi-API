@@ -97,6 +97,7 @@ export interface WebhookCaptureListResponse {
   inspectUrl: string
   requests: WebhookCaptureRecord[]
   authEnabled?: boolean
+  authQueryEnabled?: boolean
   blocked?: WebhookBlockedRecord[]
   retentionHours?: number
 }
@@ -106,13 +107,28 @@ export interface WebhookAuthHeader {
   value: string
 }
 
+export interface WebhookAuthQueryParam {
+  name: string
+  value: string
+}
+
+// `enabled`/`headers` gate the header requirement and `queryEnabled`/`queryParams`
+// gate the query-string requirement. The two halves are independent switches:
+// either, both, or neither can be on. When both are on a caller has to satisfy
+// both to get through.
 export interface WebhookAuthConfig {
   enabled: boolean
   headers: WebhookAuthHeader[]
+  queryEnabled: boolean
+  queryParams: WebhookAuthQueryParam[]
   updatedAt: string | null
 }
 
-export type WebhookBlockedReason = 'missing-header' | 'header-mismatch'
+export type WebhookBlockedReason =
+  | 'missing-header'
+  | 'header-mismatch'
+  | 'missing-query-param'
+  | 'query-param-mismatch'
 
 export interface WebhookBlockedRecord {
   id: string
@@ -130,4 +146,6 @@ export interface WebhookBlockedRecord {
   reason: WebhookBlockedReason
   missingHeaders: string[]
   mismatchedHeaders: string[]
+  missingQueryParams: string[]
+  mismatchedQueryParams: string[]
 }
