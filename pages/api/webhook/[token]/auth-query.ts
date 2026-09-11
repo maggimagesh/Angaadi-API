@@ -2,11 +2,13 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 import { applyPublicWebhookCors } from '@/utils/publicWebhookCors'
 import {
+  buildAuthorizedCaptureUrl,
   clearWebhookAuthQueryConfig,
   getWebhookAuthConfig,
   saveWebhookAuthQueryConfig,
   validateAuthQueryConfigInput,
 } from '@/utils/webhookAuth'
+import { buildWebhookUrls } from '@/utils/webhookInbox'
 import { isValidWebhookToken } from '@/utils/webhookToken'
 
 function getRouteToken(value: string | string[] | undefined): string | null {
@@ -42,12 +44,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (req.method === 'GET') {
-      const config = await getWebhookAuthConfig(token)
-      res.status(200).json({
+    // Every response carries captureUrl: the receive URL with the required
+    // params already appended, so an API consumer can hand it straight to a
+    // sender instead of assembling the query string itself.
+    const respond = (status: number, config: Awaited<ReturnType<typeof getWebhookAuthConfig>>, extra: Record<string, unknown> = {}) => {
+      const { captureUrl } = buildWebhookUrls(req, token)
+      res.status(status).json({
         token,
+        ...extra,
         config: { queryEnabled: config.queryEnabled, queryParams: config.queryParams },
+        captureUrl: buildAuthorizedCaptureUrl(captureUrl, config),
       })
+    }
+
+    if (req.method === 'GET') {
+      respond(200, await getWebhookAuthConfig(token))
       return
     }
 
@@ -58,14 +69,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return
       }
 
-      const config = await saveWebhookAuthQueryConfig(token, validation.config)
-      res.status(200).json({ ok: true, token, config })
+      respond(200, await saveWebhookAuthQueryConfig(token, validation.config), { ok: true })
       return
     }
 
     if (req.method === 'DELETE') {
-      const config = await clearWebhookAuthQueryConfig(token)
-      res.status(200).json({ ok: true, token, config })
+      respond(200, await clearWebhookAuthQueryConfig(token), { ok: true })
       return
     }
 

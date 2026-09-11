@@ -2333,7 +2333,7 @@ export default function SwaggerUIComponent() {
         get: {
           tags: ["Webhook Capture"],
           summary: "Get the query param authorization requirement for a webhook token",
-          description: "Returns only the query param half of the auth config. Use /api/webhook/{token}/auth to see headers and query params together.",
+          description: "Returns the query param half of the auth config plus `captureUrl` — the receive URL with the required params already appended, ready to hand to a sender. Use /api/webhook/{token}/auth to see headers and query params together.",
           parameters: [
             { name: "token", in: "path", required: true, schema: { type: "string" } }
           ],
@@ -2361,6 +2361,11 @@ export default function SwaggerUIComponent() {
                             }
                           }
                         }
+                      },
+                      captureUrl: {
+                        type: "string",
+                        description: "The receive URL to hand to the sender, with the required params already appended and percent-encoded. Carries no params while queryEnabled is false.",
+                        example: "https://webhooks.example.com/valid-webhooks/abc123?callback_key=secret123"
                       }
                     }
                   }
@@ -2414,7 +2419,8 @@ export default function SwaggerUIComponent() {
                     properties: {
                       ok: { type: "boolean", example: true },
                       token: { type: "string" },
-                      config: { type: "object", description: "The full auth config after the merge, headers included." }
+                      config: { type: "object", description: "The query half after the write: queryEnabled and queryParams. Use /api/webhook/{token}/auth to read headers too." },
+                      captureUrl: { type: "string", description: "The receive URL to hand to the sender, with the required params already appended and percent-encoded." }
                     }
                   }
                 }
@@ -2441,7 +2447,8 @@ export default function SwaggerUIComponent() {
                     properties: {
                       ok: { type: "boolean", example: true },
                       token: { type: "string" },
-                      config: { type: "object" }
+                      config: { type: "object", description: "The query half after the clear." },
+                      captureUrl: { type: "string", description: "The bare receive URL, with no params, now that the requirement is off." }
                     }
                   }
                 }
