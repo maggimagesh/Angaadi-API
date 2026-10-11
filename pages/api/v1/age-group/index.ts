@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { AgeGroupService, UserAgeGroupInput } from '@/services/ageGroupService'
 import { withAuth } from '@/middleware/auth'
+import { isAuthenticatedUser } from '@/utils/ownership'
 import { serializeBigInt } from '@/utils/serialize'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -23,6 +24,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           error: 'Missing required fields',
           details: 'userId and ageGroupId are required' 
         })
+      }
+
+      if (!isAuthenticatedUser(req, userId)) {
+        return res.status(403).json({ error: 'Forbidden' })
       }
 
       // Validation - Check if IDs are valid numbers and convert to BigInt

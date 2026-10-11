@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { FitAttributeService, UserFitAttributesArrayInput, FitAttributeGrouped } from '@/services/fitAttributeService'
 import { withAuth } from '@/middleware/auth'
+import { isAuthenticatedUser } from '@/utils/ownership'
 import { serializeBigInt } from '@/utils/serialize'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -30,6 +31,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           error: 'Invalid userId',
           details: 'userId must be a positive number'
         })
+      }
+
+      if (!isAuthenticatedUser(req, userId)) {
+        return res.status(403).json({ error: 'Forbidden' })
       }
 
       // Validate fitAttributeIds

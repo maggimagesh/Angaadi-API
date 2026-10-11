@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { PreferredDepartmentService, PreferredDepartmentInput } from '@/services/preferredDepartmentService'
 import { withAuth } from '@/middleware/auth'
+import { isAuthenticatedUser } from '@/utils/ownership'
 import { serializeBigInt } from '@/utils/serialize'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,6 +14,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!userId || !genderId) {
       return res.status(400).json({ error: 'userId and genderId are required' })
+    }
+
+    if (!isAuthenticatedUser(req, userId)) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     const preferredDepartmentService = new PreferredDepartmentService()

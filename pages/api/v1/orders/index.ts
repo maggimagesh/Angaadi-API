@@ -3,6 +3,8 @@ import { withAuth } from '@/middleware/auth'
 import { serializeBigInt } from '@/utils/serialize'
 import { OrderService } from '@/services/orderService'
 
+const MAX_DELIVERY_FEE = 1000
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = (req as any).user as { sub: string }
   const service = new OrderService()
@@ -17,6 +19,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { addressId, deliverySlot, paymentMethod, deliveryFee } = req.body || {}
       if (typeof addressId !== 'string' && typeof addressId !== 'number') {
         return res.status(400).json({ error: 'addressId is required' })
+      }
+      // The fee comes from the client's chosen delivery slot; reject values that
+      // would discount the order (negative) or aren't a real amount.
+      if (
+        deliveryFee !== undefined &&
+        (typeof deliveryFee !== 'number' || !Number.isFinite(deliveryFee) || deliveryFee < 0 || deliveryFee > MAX_DELIVERY_FEE)
+      ) {
+        return res.status(400).json({ error: 'Invalid delivery fee' })
       }
       const order = await service.createOrder(user.sub, {
         addressId: String(addressId),

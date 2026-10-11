@@ -4,6 +4,13 @@ import prisma from '@/lib/prisma'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Sender must be on a domain verified in Resend; override in Vercel when it changes.
+const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@angaadi.online'
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@angaadi.online'
+
+// OTPs live 5 minutes; each wrong guess removes 1, so at most ~5 guesses per OTP.
+const FAILED_ATTEMPT_PENALTY_MS = 60 * 1000
+
 export interface ForgotPasswordInput {
   emailId: string
 }
@@ -109,8 +116,8 @@ export class PasswordResetService {
                 <p style="color: #6c757d; margin: 0 0 10px; font-size: 14px;">
                   Need help? Contact our support team
                 </p>
-                <a href="mailto:support@angaadi.online" style="color: #667eea; text-decoration: none; font-weight: 600; font-size: 14px;">
-                  support@angaadi.online
+                <a href="mailto:${SUPPORT_EMAIL}" style="color: #667eea; text-decoration: none; font-weight: 600; font-size: 14px;">
+                  ${SUPPORT_EMAIL}
                 </a>
               </div>
             </div>
@@ -133,17 +140,15 @@ export class PasswordResetService {
         </html>
       `
 
-      console.log('Sending password reset email to:', emailId)
-      console.log('OTP:', otp)
 
       const result = await resend.emails.send({
-        from: 'no-reply@angaadi.online', // Using Resend's default verified sender
+        from: EMAIL_FROM, // must be on a domain verified in Resend
         to: emailId,
         subject: 'Password Reset OTP - Angaadi',
         html: emailHtml,
       })
 
-      console.log('Email sent successfully:', result)
+      if (result?.error) console.error('Password reset email was not accepted:', result.error.message)
     } catch (error) {
       console.error('Error sending password reset email:', error)
       throw new Error('Failed to send password reset email')
@@ -188,6 +193,28 @@ export class PasswordResetService {
     return { message: 'Password reset OTP sent to your email' }
   }
 
+  /**
+   * A 6-digit OTP can be brute-forced if guesses are unlimited. Each wrong
+   * guess pulls the expiry of that email's active OTPs forward by
+   * FAILED_ATTEMPT_PENALTY_MS, so an OTP survives only a handful of wrong
+   * guesses (typos still work) without needing an attempts column.
+   */
+  private async penalizeFailedAttempt(emailId: string): Promise<void> {
+    const now = Date.now()
+    const active = await prisma.otp.findMany({
+      where: { email: emailId, used: false, expiresAt: { gt: new Date(now) } },
+      select: { id: true, expiresAt: true },
+    })
+    await Promise.all(
+      active.map((record) =>
+        prisma.otp.update({
+          where: { id: record.id },
+          data: { expiresAt: new Date(record.expiresAt!.getTime() - FAILED_ATTEMPT_PENALTY_MS) },
+        })
+      )
+    )
+  }
+
   async verifyOTP(input: VerifyOTPInput): Promise<{ valid: boolean; resetToken?: string; message: string }> {
     // Find valid OTP record
     const otpRecord = await prisma.otp.findFirst({
@@ -205,6 +232,7 @@ export class PasswordResetService {
     })
 
     if (!otpRecord) {
+      await this.penalizeFailedAttempt(input.emailId)
       return { valid: false, message: 'Invalid or expired OTP' }
     }
 
@@ -248,8 +276,12 @@ export class PasswordResetService {
       data: { password: input.newPassword },
     })
 
-    // Note: OTP records are preserved for audit purposes
-    // No cleanup is performed to maintain data integrity
+    // Expire the reset token so it can't be replayed. The OTP record itself is
+    // preserved for audit purposes.
+    await prisma.otp.update({
+      where: { id: otpRecord.id },
+      data: { expiresAt: new Date() },
+    })
 
     return { message: 'Password updated successfully' }
   }

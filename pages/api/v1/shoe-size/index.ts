@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '@/middleware/auth'
+import { isAuthenticatedUser } from '@/utils/ownership'
 import { ShoeSizeService, UserShoeSizeInput } from '@/services/shoeSizeService'
 import { serializeBigInt } from '@/utils/serialize'
 
@@ -37,6 +38,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           error: 'Missing required fields',
           details: 'userId, size, and width are required'
         })
+      }
+
+      if (!isAuthenticatedUser(req, userId)) {
+        return res.status(403).json({ error: 'Forbidden' })
       }
 
       let userIdBigInt: bigint
