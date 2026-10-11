@@ -80,7 +80,7 @@ export class UserService {
     const user = await prisma.userDetails.findFirst({
       where: { emailId: input.emailId },
     })
-    if (!user || user.password !== input.password) {
+    if (!user || !user.password || !input.password || user.password !== input.password) {
       throw new Error('Invalid credentials')
     }
 

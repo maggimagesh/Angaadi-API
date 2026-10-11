@@ -1,6 +1,9 @@
 import Head from 'next/head'
 import { GetServerSideProps } from 'next'
 
+// The storefront this fixture proxies. Set UI_ORIGIN in Vercel when the domain changes.
+const UI_ORIGIN = (process.env.UI_ORIGIN || 'https://angaadi.dev').replace(/\/+$/, '')
+
 interface SlowLoadingPageProps {
   loadTime: number
   timestamp: number
@@ -280,10 +283,10 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   await new Promise((resolve) => setTimeout(resolve, 60000))
 
   try {
-    const response = await fetch('https://angaadi.online/')
+    const response = await fetch(`${UI_ORIGIN}/`)
     let html = await response.text()
     
-    html = html.replace('<head>', '<head>\n    <base href="https://angaadi.online/">')
+    html = html.replace('<head>', `<head>\n    <base href="${UI_ORIGIN}/">`)
     
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.write(html)

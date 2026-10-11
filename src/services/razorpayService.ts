@@ -19,6 +19,16 @@ function isConfigured(): boolean {
   return !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)
 }
 
+/**
+ * Demo orders are marked paid without a real payment. That's fine with test
+ * keys (no money moves either way), but with live keys a buyer could send
+ * `demo: true` and get a free order, so demo mode is refused once live keys
+ * are configured.
+ */
+function demoAllowed(): boolean {
+  return !(process.env.RAZORPAY_KEY_ID || '').startsWith('rzp_live_')
+}
+
 function authHeader(): string {
   const pair = `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
   return `Basic ${Buffer.from(pair).toString('base64')}`
@@ -55,7 +65,7 @@ export class RazorpayService {
   async createOrder(amountInRupees: number, receipt: string, forceDemo = false): Promise<CreatedRazorpayOrder> {
     const amount = toPaise(amountInRupees)
 
-    if (forceDemo || !isConfigured()) {
+    if (!isConfigured() || (forceDemo && demoAllowed())) {
       return {
         razorpayOrderId: `DEMO-${crypto.randomUUID()}`,
         amount,
@@ -96,7 +106,7 @@ export class RazorpayService {
    * success trustworthy.
    */
   verifyPayment(orderId: string, paymentId: string, signature: string): VerifiedRazorpayPayment {
-    if (orderId.startsWith('DEMO-')) {
+    if (orderId.startsWith('DEMO-') && demoAllowed()) {
       return { paymentId: `DEMO-PAY-${crypto.randomUUID()}`, status: 'captured' }
     }
 

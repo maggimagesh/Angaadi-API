@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { timingSafeEqual } from 'crypto'
 import { withCORS } from '@/middleware/cors'
 import {
   listDisabledRoutes,
@@ -13,8 +14,10 @@ function isValidScope(scope: unknown): scope is RouteToggleScope {
 function isAuthorized(req: NextApiRequest): boolean {
   const expectedSecret = process.env.API_TOGGLE_SECRET
 
+  // Without a secret anyone could switch API routes off, so an unset secret
+  // only leaves the endpoint open during local development.
   if (!expectedSecret) {
-    return true
+    return process.env.NODE_ENV === 'development'
   }
 
   const providedSecretHeader = req.headers['x-api-toggle-secret']
@@ -22,7 +25,13 @@ function isAuthorized(req: NextApiRequest): boolean {
     ? providedSecretHeader[0]
     : providedSecretHeader
 
-  return providedSecret === expectedSecret
+  if (typeof providedSecret !== 'string') {
+    return false
+  }
+
+  const expected = Buffer.from(expectedSecret)
+  const provided = Buffer.from(providedSecret)
+  return expected.length === provided.length && timingSafeEqual(expected, provided)
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
