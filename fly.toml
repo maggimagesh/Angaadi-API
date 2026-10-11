@@ -1,6 +1,7 @@
 # Fly.io deployment config for the webhook capture host.
-# Bound to https://webhooks.angaadi.online via `fly certs add` + a CNAME
-# record pointing at <app>.fly.dev.
+# Bound to https://webhooks.angaadi.dev via `fly certs add webhooks.angaadi.dev`
+# + a CNAME record pointing at <app>.fly.dev. The old webhooks.angaadi.online
+# certificate can stay attached so existing callback URLs keep working.
 #
 # Rename `app` below to whatever you used with `fly launch`.
 
@@ -13,8 +14,8 @@ primary_region = "bom"
 [env]
   NODE_ENV = "production"
   PORT = "3000"
-  WEBHOOK_PUBLIC_API_ORIGIN = "https://webhooks.angaadi.online"
-  WEBHOOK_INSPECTOR_ORIGIN = "https://webhooks.angaadi.online"
+  WEBHOOK_PUBLIC_API_ORIGIN = "https://webhooks.angaadi.dev"
+  WEBHOOK_INSPECTOR_ORIGIN = "https://webhooks.angaadi.dev"
   WEBHOOK_INSPECTOR_BASE_PATH = "/valid-webhooks"
   WEBHOOK_BODY_DIR = "/data/webhook_inbox"
   # /api/callback writes here too — must be the mounted volume, not /app.
