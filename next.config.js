@@ -25,6 +25,11 @@ const nextConfig = {
         destination: '/bad-request/index.html',
       },
       {
+        // Server-rendered "what headers did my browser send" page.
+        source: '/request-headers',
+        destination: '/api/request-headers-page',
+      },
+      {
         source: '/callback',
         destination: '/api/callback',
       },
