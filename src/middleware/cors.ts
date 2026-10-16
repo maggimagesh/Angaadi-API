@@ -1,4 +1,4 @@
-import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 import { corsWithWhitelist } from '@/utils/cors';
 import { enforceRouteAvailability } from '@/utils/apiAvailability'
 
