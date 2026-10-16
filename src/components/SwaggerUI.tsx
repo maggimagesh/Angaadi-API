@@ -53,6 +53,49 @@ export default function SwaggerUIComponent() {
           }
         }
       },
+      "/api/v1/request-headers": {
+        get: {
+          summary: "Show the request headers you sent",
+          description: "Echoes back every HTTP request header the API received, in arrival order, with the caller's IP, protocol and user agent. Credential headers are flagged sensitive; headers added by the hosting edge are flagged as proxy. Responses are never cached.",
+          responses: {
+            200: {
+              description: "Request header report",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean", example: true },
+                      method: { type: "string", example: "GET" },
+                      httpVersion: { type: "string", example: "1.1" },
+                      protocol: { type: "string", example: "https" },
+                      host: { type: "string", nullable: true, example: "api.angaadi.dev" },
+                      path: { type: "string", example: "/api/v1/request-headers" },
+                      ip: { type: "string", nullable: true, example: "203.0.113.7" },
+                      userAgent: { type: "string", nullable: true },
+                      headerCount: { type: "integer", example: 12 },
+                      headers: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string", example: "Accept" },
+                            value: { type: "string", example: "application/json" },
+                            sensitive: { type: "boolean", example: false },
+                            origin: { type: "string", enum: ["client", "proxy"] }
+                          }
+                        }
+                      },
+                      timestamp: { type: "string", format: "date-time" }
+                    }
+                  }
+                }
+              }
+            },
+            405: { description: "Method not allowed" }
+          }
+        }
+      },
       "/api/v1/system/toggle-route": {
         get: {
           summary: "List disabled API routes",
