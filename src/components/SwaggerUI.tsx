@@ -56,7 +56,7 @@ export default function SwaggerUIComponent() {
       "/api/v1/request-headers": {
         get: {
           summary: "Show the request headers you sent",
-          description: "Echoes back every HTTP request header the API received, in arrival order, with the caller's IP, protocol and user agent. Credential headers are flagged sensitive; headers added by the hosting edge are flagged as proxy. Responses are never cached.",
+          description: "Echoes back the HTTP request headers the API received, in a stable order (browser headers first, proxy headers last), with the caller's IP, protocol and user agent. The hosting platform's internal headers are never included. Credential headers are flagged sensitive; proxy headers are flagged as proxy. Responses are never cached.",
           responses: {
             200: {
               description: "Request header report",
