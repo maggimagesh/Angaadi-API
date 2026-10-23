@@ -74,6 +74,32 @@ const PROXY_HEADER_NAMES = new Set([
 ])
 const PROXY_HEADER_PREFIXES = ['x-forwarded-', 'x-vercel-', 'cf-', 'x-amzn-', 'x-envoy-']
 
+// Headers the hosting platform adds for its own use. They are never echoed:
+// some are credentials (x-vercel-oidc-token, x-vercel-proxy-signature), and the
+// rest are internal routing noise. Vercel also copies a few response-header
+// names onto the request, which the browser never sent.
+const HIDDEN_HEADER = /^(x-vercel-|x-middleware-|x-matched-path$|x-invoke-|x-now-|strict-transport-security$|referrer-policy$|x-content-type-options$)/i
+
+// The edge forwards headers in a different order on every request, so rows are
+// sorted: browser headers in the order Chrome sends them, then anything else
+// alphabetically, then proxy headers alphabetically.
+const BROWSER_ORDER = [
+  'host', 'connection', 'cache-control', 'pragma', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform',
+  'upgrade-insecure-requests', 'user-agent', 'accept', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-user',
+  'sec-fetch-dest', 'sec-fetch-storage-access', 'referer', 'accept-encoding', 'accept-language', 'cookie',
+  'if-none-match', 'if-modified-since', 'priority',
+]
+
+export function isHiddenHeader(name: string): boolean {
+  return HIDDEN_HEADER.test(name)
+}
+
+function headerRank(name: string): number {
+  if (isProxyHeader(name)) return 2000
+  const i = BROWSER_ORDER.indexOf(name.toLowerCase())
+  return i === -1 ? 1000 : i
+}
+
 export function isSensitiveHeader(name: string): boolean {
   return SENSITIVE_HEADERS.has(name.toLowerCase())
 }
@@ -113,9 +139,9 @@ function resolveProtocol(req: RequestLike): string {
 }
 
 /**
- * Lists headers in the order they arrived. rawHeaders keeps the sender's
- * casing and repeats; when it is unavailable the parsed (lowercased) map is
- * used instead, with multi-value headers expanded one row per value.
+ * Lists headers in a stable order with platform-internal headers removed.
+ * rawHeaders keeps the sender's casing and repeats; when it is unavailable the
+ * parsed (lowercased) map is used instead, one row per value.
  */
 export function listHeaders(req: RequestLike): ReportedHeader[] {
   const pairs: Array<[string, string]> = []
@@ -133,7 +159,15 @@ export function listHeaders(req: RequestLike): ReportedHeader[] {
     }
   }
 
-  return pairs.map(([name, value]) => ({
+  return pairs
+    .filter(([name]) => !isHiddenHeader(name))
+    .map((pair, index) => ({ pair, index }))
+    .sort((a, b) =>
+      headerRank(a.pair[0]) - headerRank(b.pair[0]) ||
+      a.pair[0].toLowerCase().localeCompare(b.pair[0].toLowerCase()) ||
+      a.index - b.index
+    )
+    .map(({ pair: [name, value] }) => ({
     name,
     value,
     sensitive: isSensitiveHeader(name),

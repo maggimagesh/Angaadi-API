@@ -8,20 +8,26 @@ import { mockRequest } from '../helpers/mockRequest.ts'
 import { mockResponse } from '../helpers/mockResponse.ts'
 
 describe('listHeaders', () => {
-  test('keeps arrival order, original casing and repeated headers from rawHeaders', () => {
+  test('keeps original casing and repeats, in a stable order whatever order they arrive in', () => {
+    const raw = ['X-Forwarded-For', '1.2.3.4', 'Accept', 'text/html', 'X-Custom', '1', 'Host', 'angaadi.dev', 'Accept', '*/*', 'User-Agent', 'UA']
+    const reversed: string[] = []
+    for (let i = raw.length - 2; i >= 0; i -= 2) reversed.push(raw[i], raw[i + 1])
+    const names = (rawHeaders: string[]) => listHeaders({ headers: {}, rawHeaders }).map((h) => h.name)
+    assert.deepEqual(names(raw), ['Host', 'User-Agent', 'Accept', 'Accept', 'X-Custom', 'X-Forwarded-For'])
+    assert.deepEqual(names(reversed), names(raw))
+    // Repeated headers keep the order they arrived in.
+    assert.deepEqual(
+      listHeaders({ headers: {}, rawHeaders: raw }).filter((h) => h.name === 'Accept').map((h) => h.value),
+      ['text/html', '*/*']
+    )
+  })
+
+  test("never echoes the platform's internal headers, which include credentials", () => {
     const headers = listHeaders({
       headers: {},
-      rawHeaders: ['Host', 'angaadi.dev', 'Accept', 'text/html', 'X-Forwarded-For', '1.2.3.4', 'Accept', '*/*'],
+      rawHeaders: ['x-vercel-oidc-token', 'secret', 'x-vercel-proxy-signature', 'sig', 'x-vercel-id', 'bom1', 'referrer-policy', 'x', 'accept', '*/*'],
     })
-    assert.deepEqual(
-      headers.map((h) => [h.name, h.value]),
-      [
-        ['Host', 'angaadi.dev'],
-        ['Accept', 'text/html'],
-        ['X-Forwarded-For', '1.2.3.4'],
-        ['Accept', '*/*'],
-      ]
-    )
+    assert.deepEqual(headers.map((h) => h.name), ['accept'])
   })
 
   test('falls back to the parsed map, one row per value', () => {
@@ -29,9 +35,9 @@ describe('listHeaders', () => {
     assert.deepEqual(
       headers.map((h) => [h.name, h.value]),
       [
+        ['host', 'x'],
         ['set-thing', 'a'],
         ['set-thing', 'b'],
-        ['host', 'x'],
       ]
     )
   })
